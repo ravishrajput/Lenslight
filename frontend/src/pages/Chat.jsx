@@ -20,8 +20,8 @@ function Sidebar({ chats, currentId, onNew, onDelete, onRename, onOpenDigest }) 
     <aside className="w-[280px] shrink-0 border-r border-white/10 bg-[#070707] flex flex-col h-screen">
       <div className="px-5 py-5 border-b border-white/10">
         <div className="flex items-center gap-2 mb-5">
-          <span className="inline-block w-2 h-2 bg-[#F24E1E]" />
-          <span className="font-mono text-[11px] tracking-[0.25em] text-neutral-300">INSIGHTLENS</span>
+          <img src="/logo.jpg" alt="Lenslight" className="w-5 h-5 object-cover" />
+          <span className="font-mono text-[11px] tracking-[0.25em] text-neutral-300">LENSLIGHT</span>
         </div>
         <button
           onClick={onNew}
@@ -213,7 +213,7 @@ function EmptyState({ onPick }) {
   ];
   return (
     <div className="max-w-3xl mx-auto px-6 py-16" data-testid="chat-empty-state">
-      <div className="font-mono text-[11px] tracking-[0.3em] text-neutral-500 mb-4">// INSIGHTLENS / NEW SESSION</div>
+      <div className="font-mono text-[11px] tracking-[0.3em] text-neutral-500 mb-4">// LENSLIGHT / NEW SESSION</div>
       <h1 className="font-display text-4xl lg:text-5xl font-black mb-3">What should we investigate?</h1>
       <p className="text-neutral-400 max-w-xl mb-10">
         Ask a question. We'll query the selected sources, run the analysis, and write you a report with charts and a downloadable PDF.

@@ -43,7 +43,7 @@ def build_report_pdf(question: str, markdown: str, artifacts: list[dict]) -> byt
     }
 
     story = []
-    story.append(Paragraph("InsightLens — Data Analysis Report", styles["Title"]))
+    story.append(Paragraph("Lenslight — Data Analysis Report", styles["Title"]))
     story.append(Paragraph(datetime.now(timezone.utc).strftime("Generated %b %d, %Y %H:%M UTC"), styles["Meta"]))
     story.append(Spacer(1, 14))
     story.append(Paragraph("Question", styles["H2"]))

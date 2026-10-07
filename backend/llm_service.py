@@ -3,7 +3,7 @@ import os
 import json
 from emergentintegrations.llm.chat import LlmChat, UserMessage, TextDelta, StreamDone
 
-SYSTEM_PROMPT = """You are InsightLens, an expert data analyst for a retail e-commerce business. You investigate operational and commercial metrics across Splunk (frontend event logs, service logs, errors, latency) and BigQuery (orders, sessions, markets, devices, payments).
+SYSTEM_PROMPT = """You are Lenslight, an expert data analyst for a retail e-commerce business. You investigate operational and commercial metrics across Splunk (frontend event logs, service logs, errors, latency) and BigQuery (orders, sessions, markets, devices, payments).
 
 The user asks a question (often diagnostic — "why did checkout rate drop yesterday in the US?"). The platform fetches query results from the selected sources and gives them to you as JSON. Your job: analyze that data and produce a crisp investigative REPORT in GitHub-flavored Markdown.
 

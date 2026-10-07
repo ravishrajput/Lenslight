@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 EMAIL_BASE_URL = "https://integrations.emergentagent.com"
 EMAIL_KEY = os.environ.get("EMERGENT_EMAIL_KEY")
-EMAIL_FROM_NAME = os.environ.get("EMAIL_FROM_NAME", "InsightLens")
+EMAIL_FROM_NAME = os.environ.get("EMAIL_FROM_NAME", "Lenslight")
 EMAIL_REPLY_TO = os.environ.get("EMAIL_REPLY_TO")
 
 

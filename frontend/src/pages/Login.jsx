@@ -49,8 +49,8 @@ export default function Login() {
         <div className="absolute inset-0 bg-gradient-to-tr from-black/80 via-black/30 to-black/70" />
         <div className="relative z-10 h-full flex flex-col justify-between p-12">
           <div className="flex items-center gap-2 font-mono text-xs tracking-widest text-neutral-300" data-testid="brand-logo">
-            <span className="inline-block w-2 h-2 bg-[#F24E1E]" />
-            <span>INSIGHTLENS / v0.1</span>
+            <img src="/logo.jpg" alt="Lenslight logo" className="w-6 h-6 object-cover" />
+            <span>LENSLIGHT / v0.1</span>
           </div>
           <div className="max-w-xl">
             <div className="font-mono text-xs tracking-[0.3em] text-neutral-400 mb-4">INTELLIGENCE / SPLUNK · BIGQUERY</div>
@@ -59,7 +59,7 @@ export default function Login() {
               <span className="text-neutral-500">Get a report back.</span>
             </h1>
             <p className="text-neutral-300 text-base max-w-md">
-              A ChatGPT-style terminal wired directly into your observability and warehouse stack. Prompt it. It writes the SQL and SPL for you.
+              A ChatGPT-style terminal wired directly into your observability and warehouse stack. Prompt it. Lenslight writes the SQL and SPL for you.
             </p>
           </div>
           <div className="font-mono text-[11px] text-neutral-500 tracking-wider">

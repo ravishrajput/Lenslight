@@ -15,14 +15,17 @@ export default function Connections() {
             <ArrowLeft className="w-3.5 h-3.5" /> BACK
           </Link>
           <div className="h-5 w-px bg-white/10" />
-          <div className="font-mono text-[11px] tracking-[0.3em] text-neutral-300">INSIGHTLENS / CONNECTIONS</div>
+          <div className="flex items-center gap-2">
+            <img src="/logo.jpg" alt="Lenslight" className="w-4 h-4 object-cover" />
+            <div className="font-mono text-[11px] tracking-[0.3em] text-neutral-300">LENSLIGHT / CONNECTIONS</div>
+          </div>
         </div>
       </header>
       <main className="max-w-5xl mx-auto px-6 py-14">
         <div className="font-mono text-[11px] tracking-[0.3em] text-neutral-500 mb-3">// DATA SOURCES</div>
         <h1 className="font-display text-4xl lg:text-5xl font-black mb-4">Where your reports come from.</h1>
         <p className="text-neutral-400 max-w-xl mb-10">
-          These are the systems InsightLens can query. Currently populated with simulated results for safe demos — swap in real credentials when you're ready.
+          These are the systems Lenslight can query. Currently populated with simulated results for safe demos — swap in real credentials when you're ready.
         </p>
         <div className="grid md:grid-cols-2 lg:grid-cols-2 gap-6 stagger">
           {conns.map((c) => (

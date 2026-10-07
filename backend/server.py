@@ -31,11 +31,11 @@ mongo_url = os.environ["MONGO_URL"]
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ["DB_NAME"]]
 
-app = FastAPI(title="InsightLens API")
+app = FastAPI(title="Lenslight API")
 api = APIRouter(prefix="/api")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-log = logging.getLogger("insightlens")
+log = logging.getLogger("lenslight")
 
 
 def _now() -> datetime:
@@ -399,7 +399,7 @@ async def message_pdf(message_id: str, user=Depends(current_user)):
             break
 
     pdf = build_report_pdf(question, msg["content"], msg.get("artifacts", []))
-    filename = f"insightlens-report-{msg['message_id']}.pdf"
+    filename = f"lenslight-report-{msg['message_id']}.pdf"
     return Response(
         content=pdf,
         media_type="application/pdf",
@@ -501,7 +501,7 @@ async def cron_weekly_digest(request: Request, background: BackgroundTasks):
 # ---------- Health ----------
 @api.get("/")
 async def root():
-    return {"service": "InsightLens API", "status": "ok"}
+    return {"service": "Lenslight API", "status": "ok"}
 
 
 app.include_router(api)
@@ -551,7 +551,7 @@ async def startup():
                 await db.users.update_one({"email": demo_email}, {"$set": update})
                 log.info(f"Demo user refreshed: {list(update.keys())}")
 
-    log.info("InsightLens API started.")
+    log.info("Lenslight API started.")
 
 
 @app.on_event("shutdown")

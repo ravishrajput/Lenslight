@@ -116,7 +116,7 @@ def _build_email_html(user_name: str, markdown: str, kpis: list[dict], app_url: 
     kpi_html = _kpi_row_html(kpis)
     body_html = _markdown_to_simple_html(markdown)
     footer_note = (
-        "Sent by InsightLens because you turned on the weekly digest. "
+        "Sent by Lenslight because you turned on the weekly digest. "
         "We never ask for your password or payment details by email."
     )
     cta = (
@@ -124,7 +124,7 @@ def _build_email_html(user_name: str, markdown: str, kpis: list[dict], app_url: 
         f'style="background:#111;color:#ffffff;padding:12px 18px;'
         f'font-family:Arial,sans-serif;font-size:13px;letter-spacing:0.08em;'
         f'text-transform:uppercase;text-decoration:none;display:inline-block">'
-        f'Open InsightLens</a></p>'
+        f'Open Lenslight</a></p>'
         if app_url.startswith("https://") else ""
     )
     return (
@@ -135,7 +135,7 @@ def _build_email_html(user_name: str, markdown: str, kpis: list[dict], app_url: 
         f'style="background:#ffffff;max-width:620px"><tr><td style="padding:28px 32px">'
         f'<div style="font-family:Arial,sans-serif;font-size:11px;letter-spacing:0.3em;color:#737373;text-transform:uppercase;margin-bottom:8px">'
         f'<span style="display:inline-block;width:8px;height:8px;background:#F24E1E;margin-right:8px;vertical-align:middle"></span>'
-        f'InsightLens / Weekly Digest</div>'
+        f'Lenslight / Weekly Digest</div>'
         f'<h1 style="font-family:Arial,sans-serif;font-size:26px;color:#111;margin:0 0 6px">Your week in one page.</h1>'
         f'<p style="font-family:Arial,sans-serif;font-size:14px;color:#737373;margin:0 0 8px">'
         f'Hey {escape(user_name)} — here is the auto-detected checkout, cart, and revenue read for the last 7 days.</p>'
@@ -156,5 +156,5 @@ async def generate_and_send_digest(user: dict) -> str | None:
     markdown = await analyze(question, sources, session_id=f"digest_{user['user_id']}_{datetime.now(timezone.utc).strftime('%Y%W')}")
     kpis = _detect_anomalies(sources)
     html = _build_email_html(user.get("name") or user["email"], markdown, kpis, FRONTEND_URL)
-    subject = f"InsightLens — Weekly digest for {datetime.now(timezone.utc).strftime('%b %d')}"
+    subject = f"Lenslight — Weekly digest for {datetime.now(timezone.utc).strftime('%b %d')}"
     return await send_email(to=user["email"], subject=subject, html=html)
