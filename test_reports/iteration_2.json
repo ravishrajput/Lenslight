@@ -1,0 +1,27 @@
+{
+  "summary": "Frontend-only regression test for two bug fixes (suggestion-click & new-chat send race) plus follow-up flows. All 10 scripted steps passed. Suggestion cards now dispatch the question → optimistic user msg → loading → assistant report with PDF artifact. Empty-state send button and Enter submission work; Shift+Enter inserts newline; disabling both source chips disables send; enabling one re-enables it. Follow-up on same chat appends messages without losing prior ones (4 messages, 2 PDF artifacts). Sidebar auto-renames chat to first ~60 chars of the question. 'New analysis' button creates a fresh empty state and sending from it transitions correctly without wiping optimistic user message.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Chat transcript (assistant report charts)", "issues": ["Recharts repeatedly logs 'width(-1) and height(-1) ... should be greater than 0' warnings on initial render — ResponsiveContainer parent lacks fixed/min height before layout. Charts still render after reflow but console is noisy. Consider wrapping with a container that has an explicit min-height or using aspect prop."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "(Minor) Fix Recharts ResponsiveContainer width/height=-1 warnings by giving chart wrapper an explicit minHeight (e.g., 240px) or aspect ratio."
+  ],
+  "critical_code_review_comments": [
+    "Chat.jsx handles optimistic update + race cleanly via skipLoadRef — looks good.",
+    "Composer disables send correctly when sources.length === 0 or text empty.",
+    "No data-testid gaps found for the tested flows."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (not tested)", "frontend": "100%"},
+  "test_credentials": "demo@insightlens.app / demo1234 (worked via fill-demo-creds-btn)",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Both targeted bug fixes verified end-to-end. LLM responses took ~15-30s each. Only outstanding item is cosmetic Recharts width warnings on chart first paint."
+}
