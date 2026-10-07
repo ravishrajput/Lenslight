@@ -1,0 +1,280 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* InsightLens — Command Center aesthetic */
+
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap");
+@import url("https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@700,800,900&f[]=satoshi@400,500,700&display=swap");
+
+:root {
+    --bg-void: #050505;
+    --bg-surface: #0f0f0f;
+    --bg-surface-2: #1a1a1a;
+    --border-subtle: #262626;
+    --border-focus: #404040;
+    --text-primary: #ffffff;
+    --text-secondary: #a3a3a3;
+    --accent-splunk: #f24e1e;
+    --accent-bigquery: #007aff;
+    --accent-success: #00e676;
+    --accent-error: #e63946;
+}
+
+html,
+body,
+#root {
+    background-color: var(--bg-void);
+    color: var(--text-primary);
+    min-height: 100vh;
+}
+
+body {
+    margin: 0;
+    font-family:
+        "Satoshi", ui-sans-serif, system-ui, -apple-system, "Helvetica Neue",
+        Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-image:
+        radial-gradient(
+            circle at 20% 10%,
+            rgba(242, 78, 30, 0.04),
+            transparent 40%
+        ),
+        radial-gradient(
+            circle at 80% 90%,
+            rgba(0, 122, 255, 0.04),
+            transparent 40%
+        );
+}
+
+.font-display {
+    font-family:
+        "Cabinet Grotesk", "Satoshi", ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: -0.02em;
+}
+.font-mono {
+    font-family:
+        "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+        monospace !important;
+}
+
+::selection {
+    background: var(--accent-splunk);
+    color: #050505;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: #262626;
+    border: 2px solid #050505;
+    border-radius: 0;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #404040;
+}
+
+/* Grain texture overlay */
+.grain::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.025;
+    z-index: 1;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 300 300' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' /%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Pulse dot */
+@keyframes pulse-dot {
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(0, 230, 118, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 6px rgba(0, 230, 118, 0);
+    }
+}
+.status-dot {
+    animation: pulse-dot 2s infinite;
+}
+
+/* Fade in with slight scale down (sharp snap) */
+@keyframes snap-in {
+    from {
+        opacity: 0;
+        transform: scale(1.02);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+.snap-in {
+    animation: snap-in 0.35s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+
+@keyframes stagger-rise {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+.stagger > * {
+    animation: stagger-rise 0.5s both;
+}
+.stagger > *:nth-child(1) {
+    animation-delay: 0.02s;
+}
+.stagger > *:nth-child(2) {
+    animation-delay: 0.08s;
+}
+.stagger > *:nth-child(3) {
+    animation-delay: 0.14s;
+}
+.stagger > *:nth-child(4) {
+    animation-delay: 0.2s;
+}
+.stagger > *:nth-child(5) {
+    animation-delay: 0.26s;
+}
+.stagger > *:nth-child(6) {
+    animation-delay: 0.32s;
+}
+
+/* Markdown body in assistant messages */
+.md h1,
+.md h2,
+.md h3 {
+    font-family: "Cabinet Grotesk", "Satoshi", sans-serif;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+}
+.md h1 {
+    font-size: 1.4rem;
+    margin: 1.1rem 0 0.6rem;
+}
+.md h2 {
+    font-size: 1.1rem;
+    margin: 1rem 0 0.5rem;
+    text-transform: uppercase;
+    font-size: 0.78rem;
+    letter-spacing: 0.14em;
+    color: #a3a3a3;
+}
+.md h3 {
+    font-size: 1rem;
+    margin: 0.8rem 0 0.4rem;
+}
+.md p {
+    color: #d4d4d4;
+    line-height: 1.65;
+    margin: 0.5rem 0;
+    font-size: 0.95rem;
+}
+.md ul,
+.md ol {
+    padding-left: 1.1rem;
+    margin: 0.4rem 0;
+}
+.md li {
+    color: #d4d4d4;
+    line-height: 1.6;
+    margin: 0.2rem 0;
+    font-size: 0.95rem;
+}
+.md strong {
+    color: #ffffff;
+    font-weight: 600;
+}
+.md code {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.82rem;
+    background: #1a1a1a;
+    padding: 0.1rem 0.35rem;
+    border: 1px solid #262626;
+    color: #e5e5e5;
+}
+.md pre {
+    background: #0a0a0a;
+    border: 1px solid #262626;
+    padding: 0.75rem;
+    font-size: 0.8rem;
+    overflow-x: auto;
+    margin: 0.7rem 0;
+}
+.md pre code {
+    background: transparent;
+    border: 0;
+    padding: 0;
+}
+.md table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.82rem;
+    margin: 0.6rem 0;
+}
+.md th,
+.md td {
+    border: 1px solid #262626;
+    padding: 0.4rem 0.6rem;
+    text-align: left;
+}
+.md th {
+    background: #111;
+    color: #fff;
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+}
+.md td {
+    color: #d4d4d4;
+}
+
+/* shadcn tokens (dark) */
+@layer base {
+    :root {
+        --background: 0 0% 2%;
+        --foreground: 0 0% 100%;
+        --card: 0 0% 6%;
+        --card-foreground: 0 0% 100%;
+        --popover: 0 0% 6%;
+        --popover-foreground: 0 0% 100%;
+        --primary: 0 0% 100%;
+        --primary-foreground: 0 0% 0%;
+        --secondary: 0 0% 10%;
+        --secondary-foreground: 0 0% 100%;
+        --muted: 0 0% 10%;
+        --muted-foreground: 0 0% 64%;
+        --accent: 0 0% 15%;
+        --accent-foreground: 0 0% 100%;
+        --destructive: 356 76% 56%;
+        --destructive-foreground: 0 0% 100%;
+        --border: 0 0% 15%;
+        --input: 0 0% 15%;
+        --ring: 0 0% 25%;
+        --radius: 0.25rem;
+    }
+}
+
+@layer base {
+    * {
+        @apply border-border;
+    }
+    body {
+        @apply bg-background text-foreground;
+    }
+}

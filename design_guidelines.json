@@ -1,0 +1,92 @@
+{
+  "project_context": "Hybrid Fullstack SaaS Chat + Analytics Dashboard",
+  "theme": "Strict Dark Mode (The 'Command Center' Aesthetic). Designed for data engineers and analysts interacting with Splunk and BigQuery.",
+  "typography": {
+    "headings": "Cabinet Grotesk (Weights: 700-900). Use for auth screen, empty states, and major section titles. Tracking must be tight.",
+    "body": "Satoshi (Weights: 400-500). Clean, geometric, used for standard UI text, conversational text, and form inputs.",
+    "data_and_code": "JetBrains Mono. CRITICAL: Use this for ALL data tables, chart axes, data-source chips (Splunk/BigQuery), timestamps, and markdown code blocks. Creates a technical, terminal-like trust.",
+    "banned_fonts": ["Inter", "Roboto", "Space Grotesk", "Open Sans", "Lato"]
+  },
+  "colors": {
+    "base_background": "#050505",
+    "surface_primary": "#0F0F0F",
+    "surface_secondary": "#1A1A1A",
+    "border_subtle": "#262626",
+    "border_focus": "#404040",
+    "text_primary": "#FFFFFF",
+    "text_secondary": "#A3A3A3",
+    "splunk_accent": "#F24E1E",
+    "bigquery_accent": "#007AFF",
+    "error": "#E63946",
+    "success": "#00E676",
+    "rules": "NEVER use purple-on-white gradients. Gradients are banned except for subtle 1px border glows or specific chart fill gradients (fade to transparent). Use solid, stark colors to convey 'truth' and data accuracy."
+  },
+  "visual_enhancers": {
+    "surfaces": "Use 'Grid Borders' - expose the UI skeleton. Containers should have 1px solid borders (`border-white/10`). NO soft shadows on dark mode. Use 1px inner highlights (`shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]`) to define depth.",
+    "border_radius": "Keep it sharp. Max `rounded-sm` (4px). Avoid pills unless it's a specific toggle. Data tools look more precise with sharp edges.",
+    "glassmorphism": "Only for sticky elements (like the chat composer or header). Use `backdrop-blur-xl` with `bg-[#050505]/80` and a `border-t border-white/10`. CRITICAL: Never use fully transparent backgrounds where content scrolls beneath."
+  },
+  "layouts": {
+    "auth_screen": "Split screen layout. Left: Full-height abstract data visualization image with a `bg-black/40` overlay. Right: Minimalist login form centered, using Shadcn inputs but fully squared.",
+    "main_chat": {
+      "sidebar": "Fixed width (e.g., 280px), extremely dense `JetBrains Mono` list of past chats. Hairline right border separating from main.",
+      "transcript": "Edge-to-edge block layout, not iMessage-style bubbles. Assistant messages have a subtle `bg-white/[0.02]` background and a 2px left border (`border-l-splunk_accent` or `border-l-bigquery_accent` depending on data source).",
+      "composer": "Bottom-docked, full width of transcript container. Sharp rectangle. Data-source chips (Splunk/BigQuery) sit just above or inside the composer."
+    },
+    "connections_page": "High-density Grid Mode. `gap-6`, `grid-cols-1 md:grid-cols-2 lg:grid-cols-3`. Connection cards should look like physical hardware slots—1px borders, mono status indicators (Connected/Disconnected) with a pulsing 6px colored dot."
+  },
+  "components_and_libraries": {
+    "icons": "Phosphor Icons (@phosphor-icons/react). Use duotone for active states, regular for idle.",
+    "charts": "Shadcn Charts (Recharts). Strip all default generic styling. Axes must be JetBrains Mono. Use `splunk_accent` and `bigquery_accent` for bars/lines. Enable grid lines but make them incredibly faint (`stroke-white/5`).",
+    "tables": "Shadcn Table. Extremely dense. `p-2` cells. JetBrains Mono entirely. Hover states should highlight the entire row `bg-white/5`.",
+    "toasts": "Sonner. Placed bottom-right, sharp edges, dark theme forced.",
+    "markdown": "react-markdown. Style `pre` blocks as stark dark rectangles with 1px border. Render tables cleanly with hairline borders.",
+    "buttons": "Sharp rectangles (`rounded-sm`). Solid white `bg-white text-black hover:bg-gray-200` for primary actions. `border border-white/20 text-white hover:bg-white/10` for secondary. Avoid colored buttons except for destructive actions."
+  },
+  "motion": {
+    "micro_interactions": "Hovering buttons/cards should not lift up; instead, increase border opacity (`border-white/40`) or text brightness. It feels more mechanical.",
+    "chat_streaming": "Apply a subtle staggered opacity fade-in to markdown elements as they appear, imitating a typing effect without layout shift.",
+    "page_transitions": "Framer Motion. Fade in (`opacity: 0 to 1`) and slight scale down (`scale: 1.02 to 1`) for a sharp 'snapping' into focus effect."
+  },
+  "accessibility": {
+    "contrast": "Text over backgrounds must meet APCA or WCAG AA 4.5:1. Use `#A3A3A3` for secondary text against `#050505`.",
+    "data_testid": "CRITICAL: All interactive and key informational elements MUST include a `data-testid` attribute to facilitate robust automated testing (e.g., `data-testid='login-form-submit-button'`, `data-testid='chat-send-btn'`, `data-testid='data-source-chip-splunk'`)."
+  },
+  "media": {
+    "auth_background": {
+      "url": "https://images.unsplash.com/photo-1709626011485-6fe000ea2dbc?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDR8MHwxfHNlYXJjaHwzfHxhYnN0cmFjdCUyMGRhdGElMjBnZW9tZXRyeSUyMGRhcmt8ZW58MHx8fHwxNzkxMzk0NDc4fDA&ixlib=rb-4.1.0&q=85",
+      "description": "Abstract data geometry dark background. Use for the left side of the split Auth screen."
+    },
+    "user_avatar": {
+      "url": "https://images.unsplash.com/photo-1657180881998-c8a03ef22695?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2OTV8MHwxfHNlYXJjaHw0fHxwcm9mZXNzaW9uYWwlMjBhdmF0YXIlMjBwb3J0cmFpdHxlbnwwfHx8fDE3OTEzOTQ0Nzh8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Professional avatar. Use in the user profile menu/logout area in the sidebar."
+    }
+  },
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "You tend to converge toward generic, 'on distribution' outputs. In frontend design, this creates what users call the 'AI slop' aesthetic. Avoid this: make creative, distinctive frontends that surprise and delight.",
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients.",
+    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
+    "Create depth through layered design elements with z-index hierarchy.",
+    "Use glass-morphism effects with backdrop filters (12-24px blur).",
+    "You MUST NOT apply universal transition. Eg: transition: all. This results in breaking transforms. Always add transitions for specific interactive elements like button, input excluding transforms.",
+    "You MUST NOT center align the app container, ie do not add .App { text-align: center; } in the css file. This disrupts the human natural reading flow of text.",
+    "Always use modern button styles like pill-shaped, or sharp button with interaction animations & color relevant to the app style.",
+    "NEVER: use AI assistant Emoji characters like 🤖🧠💭💡🔮🎯 etc for icons.",
+    "Every interaction needs micro-animations - hover states, transitions, parallax effects, and entrance animations. Static = dead.",
+    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "Subtle grain textures, noise overlays, custom cursors, selection states, and loading animations: separates good from extraordinary.",
+    "Main agent relies on these image URLs. Missing categories (especially sponsor logos) = main agent will use placeholder text which is FORBIDDEN.",
+    "Prioritize using pre-existing components from src/components/ui when applicable.",
+    "Create new components that match the style and conventions of existing components when needed.",
+    "Examine existing components to understand the project's component patterns before creating new ones.",
+    "Use sonner for toasts, located in /app/src/components/ui/sonner.tsx"
+  ],
+  "instructions_to_main_agent": [
+    "Do not use generic blue themes. Stick strictly to the #050505 void black base and stark white primary text.",
+    "Use JetBrains Mono aggressively for data elements. If data looks like a blog post, you have failed. It must look like a command center.",
+    "Never use soft bubbles for chat messages. Use full-width separated blocks with distinct background hues for distinction.",
+    "The connections page MUST look robust and technical, not playful. Solid borders, clear status indicators.",
+    "Ensure the PDF download button stands out but matches the brutalist aesthetic (e.g., sharp outline button).",
+    "Use Lucide icons if Phosphor is unavailable, but keep stroke widths thin (1.5px max) for a sharp look."
+  ]
+}
