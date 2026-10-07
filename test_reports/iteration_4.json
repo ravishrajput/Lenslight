@@ -1,0 +1,38 @@
+{
+  "summary": "Tested the new streaming SSE chat endpoint end-to-end (backend pytest + frontend Playwright). Found + fixed one CRITICAL bug: the PDF export route decorator was mangled onto a comment line in server.py so GET /api/messages/{id}/pdf returned 404. After fix, all 3 backend tests pass and full frontend streaming UX works: stream-waiting indicator → progressive markdown growth with blinking stream-cursor → artifacts (charts/tables/queries) render only after done → DOWNLOAD PDF REPORT button appears → sidebar auto-renames chat → send button busy-disabled during stream → both-sources-off disables send → follow-up second stream works and prior PDF button survives. Backward-compatible non-streaming endpoint still works. 404 is returned for other users' / missing chat on the stream endpoint.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/messages/{message_id}/pdf", "issue": "Decorator was concatenated to the end of a comment line (`# ---------- PDF export ----------@api.get(...)`), so the decorator was never applied and the route was unregistered -> 404. FIXED by splitting onto its own line in /app/backend/server.py.", "priority": "CRITICAL"}
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_streaming.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "No action required — the single critical bug (PDF route commented out) was fixed by testing agent and verified by passing tests + frontend screenshot showing working DOWNLOAD PDF REPORT button."
+  ],
+  "critical_code_review_comments": [
+    "server.py line 385 originally had `# ---------- PDF export ----------@api.get(\"/messages/{message_id}/pdf\")` — comment + decorator merged. This exact class of bug (decorator silently commented) is dangerous because the file still imports/runs. Consider adding a lint check or a smoke test that enumerates app.routes to catch missing endpoints.",
+    "server.py is ~560 lines and growing; consider splitting routers (auth, chats, messages, digests, cron) into separate modules.",
+    "stream_analyze() in llm_service.py has no try/except around chat.stream_message — the fallback is handled by server.py's gen() but if the generator raises before the first yield, user_message is already persisted. Acceptable but noted.",
+    "Streaming endpoint persists user message to Mongo before yielding first SSE event; if client disconnects early, assistant_msg won't be written but user_msg stays — chat history will show a question without an answer. Minor UX concern."
+  ],
+  "updated_files": [
+    "/app/backend/server.py",
+    "/app/backend/tests/test_streaming.py"
+  ],
+  "success_rate": {"backend": "100% (3/3 after fix)", "frontend": "100%"},
+  "test_credentials": "demo@insightlens.app / demo1234 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "None — reused demo user auto-seeded on backend startup",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "test_streaming.py covers: SSE content-type, event ordering (user_message→start→delta→artifacts→done), message_id consistency, mongo persistence verification via GET /messages, PDF endpoint, 404 for missing chat, and non-streaming backward compat. Playwright flow validated progressive content growth (3 polls showed 543→1084→1604→2162→2676→3058 chars), blinking cursor, delayed artifact + PDF button rendering, auto-rename, follow-up streaming without clobbering first message.",
+  "rca of the issue": "Root cause: when the new streaming endpoint block was inserted into server.py, the pre-existing `# ---------- PDF export ----------` comment line lost its trailing newline, causing the following `@api.get('/messages/{message_id}/pdf')` decorator to be absorbed into the comment. Python therefore defined `message_pdf` as a plain coroutine function never bound to the APIRouter. Reproduction: GET /api/messages/<any id>/pdf -> 404 {\"detail\":\"Not Found\"}. Mitigation: inserted a newline between the comment and the decorator; verified via test_streaming.py that pdf returns 200 application/pdf with %PDF magic bytes."
+}

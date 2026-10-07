@@ -382,7 +382,8 @@ async def send_message_stream(chat_id: str, payload: SendMessageIn, user=Depends
     )
 
 
-# ---------- PDF export ----------@api.get("/messages/{message_id}/pdf")
+# ---------- PDF export ----------
+@api.get("/messages/{message_id}/pdf")
 async def message_pdf(message_id: str, user=Depends(current_user)):
     msg = await db.messages.find_one({"message_id": message_id, "user_id": user["user_id"]}, {"_id": 0})
     if not msg or msg["role"] != "assistant":
