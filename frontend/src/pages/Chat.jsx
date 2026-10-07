@@ -3,14 +3,15 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { http } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import MessageView from "@/components/MessageView";
+import DigestSettings from "@/components/DigestSettings";
 import {
-  Plus, Send, Loader2, Trash2, Pencil, LogOut, Database, ChevronRight, Check, X
+  Plus, Send, Loader2, Trash2, Pencil, LogOut, Database, ChevronRight, Check, X, Mail
 } from "lucide-react";
 
 const SPLUNK = "#F24E1E";
 const BQ = "#007AFF";
 
-function Sidebar({ chats, currentId, onNew, onDelete, onRename }) {
+function Sidebar({ chats, currentId, onNew, onDelete, onRename, onOpenDigest }) {
   const { user, logout } = useAuth();
   const [editingId, setEditingId] = useState(null);
   const [editValue, setEditValue] = useState("");
@@ -95,6 +96,18 @@ function Sidebar({ chats, currentId, onNew, onDelete, onRename }) {
       </div>
 
       <div className="border-t border-white/10 p-3">
+        <button
+          onClick={onOpenDigest}
+          data-testid="open-digest-settings-btn"
+          className="w-full flex items-center justify-between px-3 py-2 border border-white/10 hover:border-[#F24E1E]/60 mb-2 group"
+          style={{ transitionProperty: "border-color" }}
+        >
+          <span className="flex items-center gap-2 font-mono text-xs text-neutral-300 group-hover:text-[#F24E1E]"
+                style={{ transitionProperty: "color" }}>
+            <Mail className="w-3.5 h-3.5" /> WEEKLY DIGEST
+          </span>
+          <ChevronRight className="w-3.5 h-3.5 text-neutral-500" />
+        </button>
         <Link
           to="/connections"
           data-testid="connections-link"
@@ -235,6 +248,7 @@ export default function Chat() {
   const [chats, setChats] = useState([]);
   const [messages, setMessages] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [digestOpen, setDigestOpen] = useState(false);
   const scrollRef = useRef(null);
   const skipLoadRef = useRef(null);
 
@@ -316,6 +330,7 @@ export default function Chat() {
         onNew={createNew}
         onDelete={onDelete}
         onRename={onRename}
+        onOpenDigest={() => setDigestOpen(true)}
       />
       <main className="flex-1 flex flex-col h-screen">
         <div ref={scrollRef} className="flex-1 overflow-y-auto" data-testid="chat-transcript">
@@ -335,6 +350,7 @@ export default function Chat() {
         </div>
         <Composer onSend={onSend} busy={busy} />
       </main>
+      <DigestSettings open={digestOpen} onClose={() => setDigestOpen(false)} />
     </div>
   );
 }

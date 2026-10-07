@@ -6,12 +6,14 @@ load_dotenv(ROOT_DIR / ".env")
 
 import os
 import uuid
+import hmac
+import asyncio
 import logging
 import httpx
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
-from fastapi import FastAPI, APIRouter, Response, Request, HTTPException, Depends, Query
+from fastapi import FastAPI, APIRouter, Response, Request, HTTPException, Depends, Query, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -21,6 +23,7 @@ from auth_utils import hash_password, verify_password, create_access_token, get_
 from mock_data import splunk_mock, bigquery_mock, build_artifacts
 from llm_service import analyze
 from pdf_service import build_report_pdf
+from digest_service import generate_and_send_digest
 
 # ----- Mongo -----
 mongo_url = os.environ["MONGO_URL"]
@@ -73,6 +76,11 @@ class ChatRenameIn(BaseModel):
 class SendMessageIn(BaseModel):
     content: str
     sources: list[str] = Field(default_factory=lambda: ["splunk", "bigquery"])
+
+
+class DigestSubscribeIn(BaseModel):
+    subscribed: bool
+    digest_email: Optional[EmailStr] = None
 
 
 # ---------- Auth ----------
@@ -322,6 +330,97 @@ async def message_pdf(message_id: str, user=Depends(current_user)):
     )
 
 
+# ---------- Weekly Digest ----------
+@api.get("/digests/me")
+async def get_digest_prefs(user=Depends(current_user)):
+    return {
+        "email": user["email"],
+        "digest_email": user.get("digest_email") or user["email"],
+        "subscribed": bool(user.get("weekly_digest", False)),
+    }
+
+
+@api.post("/digests/subscribe")
+async def set_digest_prefs(payload: DigestSubscribeIn, user=Depends(current_user)):
+    update = {"weekly_digest": bool(payload.subscribed)}
+    if payload.digest_email:
+        update["digest_email"] = payload.digest_email.lower()
+    await db.users.update_one({"user_id": user["user_id"]}, {"$set": update})
+    return {
+        "subscribed": bool(payload.subscribed),
+        "digest_email": update.get("digest_email") or user.get("digest_email") or user["email"],
+    }
+
+
+async def _send_digest_task(user_id: str):
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 0})
+    if not user:
+        return
+    recipient = user.get("digest_email") or user["email"]
+    try:
+        eid = await generate_and_send_digest({**user, "email": recipient})
+        await db.digest_runs.insert_one({
+            "user_id": user_id,
+            "email": recipient,
+            "email_id": eid,
+            "status": "sent",
+            "sent_at": _now().isoformat(),
+        })
+        log.info(f"Digest sent to {recipient} (id={eid})")
+    except Exception as e:
+        log.exception(f"Digest send failed for {user_id}")
+        await db.digest_runs.insert_one({
+            "user_id": user_id,
+            "email": recipient,
+            "status": "error",
+            "error": str(e),
+            "sent_at": _now().isoformat(),
+        })
+
+
+@api.post("/digests/preview")
+async def preview_digest(background: BackgroundTasks, user=Depends(current_user)):
+    background.add_task(_send_digest_task, user["user_id"])
+    return {"status": "queued", "email": user["email"]}
+
+
+# ---------- Cron Webhook ----------
+@api.post("/cron/weekly-digest")
+async def cron_weekly_digest(request: Request, background: BackgroundTasks):
+    # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
+    secret = os.environ.get("WEBHOOK_CRON_SECRET", "")
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer ") or not secret:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    if not hmac.compare_digest(auth[7:], secret):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    run_id = request.headers.get("X-Webhook-Id")
+    try:
+        envelope = await request.json()
+    except Exception:
+        envelope = {}
+    if not run_id:
+        run_id = envelope.get("run_id") or f"manual_{uuid.uuid4().hex[:10]}"
+
+    # Idempotency guard
+    if await db.cron_runs.find_one({"run_id": run_id}):
+        return {"status": "duplicate", "run_id": run_id}
+    await db.cron_runs.insert_one({"run_id": run_id, "received_at": _now().isoformat()})
+
+    async def dispatch_all():
+        cursor = db.users.find({"weekly_digest": True}, {"_id": 0, "password_hash": 0})
+        async for u in cursor:
+            try:
+                await _send_digest_task(u["user_id"])
+                await asyncio.sleep(0.5)
+            except Exception:
+                log.exception(f"digest dispatch failed for {u.get('user_id')}")
+
+    background.add_task(dispatch_all)
+    return {"status": "accepted", "run_id": run_id}
+
+
 # ---------- Health ----------
 @api.get("/")
 async def root():
@@ -361,15 +460,19 @@ async def startup():
                 "picture": None,
                 "password_hash": hash_password(demo_password),
                 "provider": "password",
+                "digest_email": "delivered@resend.dev",
                 "created_at": _now().isoformat(),
             })
             log.info(f"Demo user seeded: {demo_email}")
-        elif not verify_password(demo_password, existing.get("password_hash", "")):
-            await db.users.update_one(
-                {"email": demo_email},
-                {"$set": {"password_hash": hash_password(demo_password)}},
-            )
-            log.info(f"Demo user password refreshed: {demo_email}")
+        else:
+            update = {}
+            if not verify_password(demo_password, existing.get("password_hash", "")):
+                update["password_hash"] = hash_password(demo_password)
+            if not existing.get("digest_email"):
+                update["digest_email"] = "delivered@resend.dev"
+            if update:
+                await db.users.update_one({"email": demo_email}, {"$set": update})
+                log.info(f"Demo user refreshed: {list(update.keys())}")
 
     log.info("InsightLens API started.")
 
