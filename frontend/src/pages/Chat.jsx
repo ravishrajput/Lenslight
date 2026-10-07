@@ -169,7 +169,7 @@ function Composer({ onSend, busy }) {
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { submit(e); } }}
             rows={2}
-            placeholder="Ask about error rates, latency, revenue, signups… across your data."
+            placeholder="Ask about checkout rate, cart abandonment, revenue by market, funnel dropoff…"
             data-testid="chat-input"
             className="flex-1 bg-transparent px-4 py-3 text-sm text-white placeholder-neutral-600 focus:outline-none resize-none font-mono"
           />
@@ -193,10 +193,10 @@ function Composer({ onSend, busy }) {
 
 function EmptyState() {
   const suggestions = [
-    "Why did error rates spike in the last 24 hours?",
-    "Compare revenue across regions for the last 14 days.",
-    "Show p95 latency per service and highlight the slowest.",
-    "How are new user signups trending week over week?",
+    "Why was checkout rate down yesterday in the US market?",
+    "Compare revenue across markets for the last 14 days.",
+    "Which payment methods have the worst success rate?",
+    "Where are shoppers abandoning the checkout funnel?",
   ];
   return (
     <div className="max-w-3xl mx-auto px-6 py-16" data-testid="chat-empty-state">
