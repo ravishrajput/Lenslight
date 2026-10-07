@@ -9,8 +9,10 @@ export function AuthProvider({ children }) {
 
   const checkAuth = useCallback(async () => {
     try {
-      const { data } = await http.get("/auth/me");
-      setUser(data);
+      // validateStatus so 401 doesn't throw and get flagged as an unhandled rejection
+      const res = await http.get("/auth/me", { validateStatus: (s) => s < 500 });
+      if (res.status === 200) setUser(res.data);
+      else setUser(false);
     } catch {
       setUser(false);
     }
