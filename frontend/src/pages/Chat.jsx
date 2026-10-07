@@ -191,7 +191,7 @@ function Composer({ onSend, busy }) {
   );
 }
 
-function EmptyState() {
+function EmptyState({ onPick }) {
   const suggestions = [
     "Why was checkout rate down yesterday in the US market?",
     "Compare revenue across markets for the last 14 days.",
@@ -207,18 +207,22 @@ function EmptyState() {
       </p>
       <div className="grid sm:grid-cols-2 gap-3">
         {suggestions.map((s, i) => (
-          <div key={i} data-testid={`suggestion-${i}`} className="border border-white/10 hover:border-white/40 p-4 cursor-pointer group"
-               style={{ transitionProperty: "border-color" }}
-               onClick={() => {
-                 const el = document.querySelector('[data-testid="chat-input"]');
-                 if (el) { el.value = s; el.focus(); el.dispatchEvent(new Event('input', { bubbles: true })); }
-               }}>
-            <div className="font-mono text-[10px] text-neutral-500 tracking-widest mb-2 group-hover:text-[#F24E1E]"
-                 style={{ transitionProperty: "color" }}>
+          <button
+            type="button"
+            key={i}
+            data-testid={`suggestion-${i}`}
+            onClick={() => onPick(s)}
+            className="text-left border border-white/10 hover:border-white/40 p-4 group bg-transparent"
+            style={{ transitionProperty: "border-color" }}
+          >
+            <div
+              className="font-mono text-[10px] text-neutral-500 tracking-widest mb-2 group-hover:text-[#F24E1E]"
+              style={{ transitionProperty: "color" }}
+            >
               EXAMPLE / {String(i + 1).padStart(2, "0")}
             </div>
             <div className="text-sm text-neutral-200">{s}</div>
-          </div>
+          </button>
         ))}
       </div>
     </div>
@@ -232,6 +236,7 @@ export default function Chat() {
   const [messages, setMessages] = useState([]);
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef(null);
+  const skipLoadRef = useRef(null);
 
   const loadChats = async () => {
     const { data } = await http.get("/chats");
@@ -248,7 +253,13 @@ export default function Chat() {
   };
 
   useEffect(() => { loadChats(); }, []);
-  useEffect(() => { loadMessages(chatId); }, [chatId]);
+  useEffect(() => {
+    if (skipLoadRef.current === chatId) {
+      skipLoadRef.current = null;
+      return;
+    }
+    loadMessages(chatId);
+  }, [chatId]);
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, busy]);
@@ -274,15 +285,17 @@ export default function Chat() {
 
   const onSend = async (content, sources) => {
     let activeId = chatId;
-    if (!activeId) {
+    const isNew = !activeId;
+    if (isNew) {
       const { data } = await http.post("/chats", {});
       activeId = data.chat_id;
+      skipLoadRef.current = activeId;
       await loadChats();
       nav(`/chat/${activeId}`, { replace: true });
     }
     // optimistic user message
     const temp = { message_id: `tmp_${Date.now()}`, role: "user", content, sources, artifacts: [], created_at: new Date().toISOString() };
-    setMessages((m) => [...m, temp]);
+    setMessages((m) => (isNew ? [temp] : [...m, temp]));
     setBusy(true);
     try {
       const { data } = await http.post(`/chats/${activeId}/messages`, { content, sources });
@@ -307,7 +320,7 @@ export default function Chat() {
       <main className="flex-1 flex flex-col h-screen">
         <div ref={scrollRef} className="flex-1 overflow-y-auto" data-testid="chat-transcript">
           {messages.length === 0 && !busy ? (
-            <EmptyState />
+            <EmptyState onPick={(text) => onSend(text, ["splunk", "bigquery"])} />
           ) : (
             <div className="max-w-3xl mx-auto px-6 py-4">
               {messages.map((m) => <MessageView key={m.message_id} msg={m} />)}
