@@ -124,6 +124,8 @@ function PdfButton({ messageId }) {
 export default function MessageView({ msg }) {
   const isUser = msg.role === "user";
   const accentColor = msg.sources?.includes("splunk") ? SPLUNK : BQ;
+  const isStreaming = !!msg._streaming;
+  const isPersisted = msg.message_id && !msg.message_id.startsWith("tmp_");
 
   if (isUser) {
     return (
@@ -155,11 +157,21 @@ export default function MessageView({ msg }) {
           REPORT
         </div>
         <div className="flex-1 border-l-2 pl-5" style={{ borderColor: accentColor }}>
-          <div className="md stagger">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
-          </div>
-          {msg.artifacts?.length ? (
-            <div className="mt-5 space-y-4">
+          {isStreaming && !msg.content ? (
+            <div className="flex items-center gap-2 font-mono text-xs text-neutral-500" data-testid="stream-waiting">
+              <span className="inline-block w-1.5 h-1.5 bg-neutral-400 animate-pulse" />
+              Querying sources & opening model stream…
+            </div>
+          ) : (
+            <div className="md">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+              {isStreaming && (
+                <span className="inline-block w-[9px] h-[14px] bg-white align-middle ml-0.5 animate-pulse" data-testid="stream-cursor" />
+              )}
+            </div>
+          )}
+          {!isStreaming && msg.artifacts?.length ? (
+            <div className="mt-5 space-y-4 snap-in">
               {msg.artifacts.map((art, i) => {
                 if (art.type === "chart") return <Chart key={i} art={art} />;
                 if (art.type === "table") return <DataTable key={i} art={art} />;
@@ -168,7 +180,9 @@ export default function MessageView({ msg }) {
               })}
             </div>
           ) : null}
-          <div className="mt-5"><PdfButton messageId={msg.message_id} /></div>
+          {!isStreaming && isPersisted ? (
+            <div className="mt-5"><PdfButton messageId={msg.message_id} /></div>
+          ) : null}
         </div>
       </div>
     </div>

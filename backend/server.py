@@ -5,6 +5,7 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
 import os
+import json
 import uuid
 import hmac
 import asyncio
@@ -21,7 +22,7 @@ from pydantic import BaseModel, EmailStr, Field
 
 from auth_utils import hash_password, verify_password, create_access_token, get_current_user
 from mock_data import splunk_mock, bigquery_mock, build_artifacts
-from llm_service import analyze
+from llm_service import analyze, stream_analyze
 from pdf_service import build_report_pdf
 from digest_service import generate_and_send_digest
 
@@ -305,8 +306,83 @@ async def send_message(chat_id: str, payload: SendMessageIn, user=Depends(curren
     return {"user_message": user_msg, "assistant_message": assistant_msg}
 
 
-# ---------- PDF export ----------
-@api.get("/messages/{message_id}/pdf")
+# ---------- Streaming chat ----------
+@api.post("/chats/{chat_id}/messages/stream")
+async def send_message_stream(chat_id: str, payload: SendMessageIn, user=Depends(current_user)):
+    chat = await db.chats.find_one({"chat_id": chat_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+
+    def sse(obj: dict) -> str:
+        return f"data: {json.dumps(obj)}\n\n"
+
+    async def gen():
+        user_msg = {
+            "message_id": f"msg_{uuid.uuid4().hex[:12]}",
+            "chat_id": chat_id,
+            "user_id": user["user_id"],
+            "role": "user",
+            "content": payload.content,
+            "sources": payload.sources,
+            "artifacts": [],
+            "created_at": _now().isoformat(),
+        }
+        await db.messages.insert_one(user_msg)
+        user_msg.pop("_id", None)
+        yield sse({"type": "user_message", "data": user_msg})
+
+        sources_data = []
+        if "splunk" in payload.sources:
+            sources_data.append(splunk_mock(payload.content))
+        if "bigquery" in payload.sources:
+            sources_data.append(bigquery_mock(payload.content))
+        artifacts = build_artifacts(sources_data)
+
+        assistant_id = f"msg_{uuid.uuid4().hex[:12]}"
+        yield sse({"type": "start", "message_id": assistant_id})
+
+        full_text = ""
+        try:
+            async for chunk in stream_analyze(payload.content, sources_data, session_id=chat_id):
+                full_text += chunk
+                yield sse({"type": "delta", "text": chunk})
+        except Exception as e:
+            fallback = (
+                f"\n\n**Model stream interrupted.** ({type(e).__name__}) "
+                "The query results are still shown below."
+            )
+            full_text += fallback
+            yield sse({"type": "delta", "text": fallback})
+
+        yield sse({"type": "artifacts", "data": artifacts})
+
+        assistant_msg = {
+            "message_id": assistant_id,
+            "chat_id": chat_id,
+            "user_id": user["user_id"],
+            "role": "assistant",
+            "content": full_text,
+            "sources": payload.sources,
+            "artifacts": artifacts,
+            "created_at": _now().isoformat(),
+        }
+        await db.messages.insert_one(assistant_msg)
+
+        update = {"updated_at": _now().isoformat()}
+        if chat["title"] == "New analysis":
+            update["title"] = payload.content[:60] + ("…" if len(payload.content) > 60 else "")
+        await db.chats.update_one({"chat_id": chat_id}, {"$set": update})
+
+        yield sse({"type": "done", "message_id": assistant_id})
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"},
+    )
+
+
+# ---------- PDF export ----------@api.get("/messages/{message_id}/pdf")
 async def message_pdf(message_id: str, user=Depends(current_user)):
     msg = await db.messages.find_one({"message_id": message_id, "user_id": user["user_id"]}, {"_id": 0})
     if not msg or msg["role"] != "assistant":

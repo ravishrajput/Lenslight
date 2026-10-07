@@ -1,7 +1,7 @@
 """LLM service wrapper around emergentintegrations for Claude Sonnet 5.5."""
 import os
 import json
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+from emergentintegrations.llm.chat import LlmChat, UserMessage, TextDelta, StreamDone
 
 SYSTEM_PROMPT = """You are InsightLens, an expert data analyst for a retail e-commerce business. You investigate operational and commercial metrics across Splunk (frontend event logs, service logs, errors, latency) and BigQuery (orders, sessions, markets, devices, payments).
 
@@ -19,18 +19,22 @@ RULES for your markdown response:
 """
 
 
-async def analyze(question: str, sources_data: list[dict], session_id: str) -> str:
+def _build_chat(session_id: str):
     api_key = os.environ["EMERGENT_LLM_KEY"]
-    context = json.dumps(sources_data, default=str)
-    chat = LlmChat(
-        api_key=api_key,
-        session_id=session_id,
-        system_message=SYSTEM_PROMPT,
+    return LlmChat(
+        api_key=api_key, session_id=session_id, system_message=SYSTEM_PROMPT
     ).with_model("anthropic", "claude-sonnet-5-5")
 
-    prompt = f"USER QUESTION:\n{question}\n\nQUERY RESULTS (JSON):\n{context}\n\nWrite the report now."
+
+def _build_prompt(question: str, sources_data: list[dict]) -> str:
+    context = json.dumps(sources_data, default=str)
+    return f"USER QUESTION:\n{question}\n\nQUERY RESULTS (JSON):\n{context}\n\nWrite the report now."
+
+
+async def analyze(question: str, sources_data: list[dict], session_id: str) -> str:
     try:
-        reply = await chat.send_message(UserMessage(text=prompt))
+        chat = _build_chat(session_id)
+        reply = await chat.send_message(UserMessage(text=_build_prompt(question, sources_data)))
         return reply if isinstance(reply, str) else str(reply)
     except Exception as e:
         return (
@@ -38,3 +42,14 @@ async def analyze(question: str, sources_data: list[dict], session_id: str) -> s
             "The query results below were retrieved successfully from the connected sources. "
             "Please retry in a moment for the AI-generated narrative."
         )
+
+
+async def stream_analyze(question: str, sources_data: list[dict], session_id: str):
+    """Yields text chunks as the LLM produces them."""
+    chat = _build_chat(session_id)
+    async for event in chat.stream_message(UserMessage(text=_build_prompt(question, sources_data))):
+        if isinstance(event, TextDelta):
+            if event.content:
+                yield event.content
+        elif isinstance(event, StreamDone):
+            break

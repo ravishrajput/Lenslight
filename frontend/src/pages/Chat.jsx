@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { http } from "@/lib/api";
+import { http, API } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import MessageView from "@/components/MessageView";
 import DigestSettings from "@/components/DigestSettings";
@@ -307,16 +307,60 @@ export default function Chat() {
       await loadChats();
       nav(`/chat/${activeId}`, { replace: true });
     }
-    // optimistic user message
-    const temp = { message_id: `tmp_${Date.now()}`, role: "user", content, sources, artifacts: [], created_at: new Date().toISOString() };
-    setMessages((m) => (isNew ? [temp] : [...m, temp]));
+    const tempUserId = `tmp_user_${Date.now()}`;
+    const streamKey = `tmp_assist_${Date.now()}`;
+    const userTemp = { message_id: tempUserId, role: "user", content, sources, artifacts: [], created_at: new Date().toISOString() };
+    const assistantTemp = { message_id: streamKey, role: "assistant", content: "", sources, artifacts: [], created_at: new Date().toISOString(), _streaming: true };
+
+    setMessages((m) => (isNew ? [userTemp, assistantTemp] : [...m, userTemp, assistantTemp]));
     setBusy(true);
+
     try {
-      const { data } = await http.post(`/chats/${activeId}/messages`, { content, sources });
-      setMessages((m) => [...m.filter((x) => x.message_id !== temp.message_id), data.user_message, data.assistant_message]);
+      const resp = await fetch(`${API}/chats/${activeId}/messages/stream`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ content, sources }),
+      });
+      if (!resp.ok || !resp.body) throw new Error(`stream failed (${resp.status})`);
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      let assistantText = "";
+      let assistantId = streamKey;
+      let finalArtifacts = [];
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const parts = buf.split("\n\n");
+        buf = parts.pop() ?? "";
+        for (const raw of parts) {
+          const line = raw.trim();
+          if (!line.startsWith("data:")) continue;
+          let evt;
+          try { evt = JSON.parse(line.slice(5).trim()); } catch { continue; }
+          if (evt.type === "user_message") {
+            setMessages((m) => m.map((x) => (x.message_id === tempUserId ? evt.data : x)));
+          } else if (evt.type === "start") {
+            assistantId = evt.message_id;
+            setMessages((m) => m.map((x) => (x.message_id === streamKey ? { ...x, message_id: assistantId } : x)));
+          } else if (evt.type === "delta") {
+            assistantText += evt.text || "";
+            setMessages((m) => m.map((x) => (x.message_id === assistantId ? { ...x, content: assistantText } : x)));
+          } else if (evt.type === "artifacts") {
+            finalArtifacts = evt.data || [];
+            setMessages((m) => m.map((x) => (x.message_id === assistantId ? { ...x, artifacts: finalArtifacts } : x)));
+          } else if (evt.type === "done") {
+            setMessages((m) => m.map((x) => (x.message_id === assistantId ? { ...x, _streaming: false, content: assistantText, artifacts: finalArtifacts } : x)));
+          }
+        }
+      }
       loadChats();
     } catch (e) {
-      setMessages((m) => m.filter((x) => x.message_id !== temp.message_id));
+      setMessages((m) => m.filter((x) => x.message_id !== tempUserId && x.message_id !== streamKey));
     } finally {
       setBusy(false);
     }
@@ -339,12 +383,6 @@ export default function Chat() {
           ) : (
             <div className="max-w-3xl mx-auto px-6 py-4">
               {messages.map((m) => <MessageView key={m.message_id} msg={m} />)}
-              {busy && (
-                <div className="py-6 flex items-center gap-3 font-mono text-xs text-neutral-500" data-testid="chat-loading">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  Querying sources & synthesizing report…
-                </div>
-              )}
             </div>
           )}
         </div>
