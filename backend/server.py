@@ -347,6 +347,30 @@ async def startup():
     await db.chats.create_index([("user_id", 1), ("updated_at", -1)])
     await db.messages.create_index([("chat_id", 1), ("created_at", 1)])
     await db.user_sessions.create_index("session_token", unique=True)
+
+    # Idempotent demo user seed — guarantees login works with .env creds
+    demo_email = os.environ.get("DEMO_EMAIL", "").lower()
+    demo_password = os.environ.get("DEMO_PASSWORD", "")
+    if demo_email and demo_password:
+        existing = await db.users.find_one({"email": demo_email})
+        if existing is None:
+            await db.users.insert_one({
+                "user_id": f"user_{uuid.uuid4().hex[:12]}",
+                "email": demo_email,
+                "name": "Demo",
+                "picture": None,
+                "password_hash": hash_password(demo_password),
+                "provider": "password",
+                "created_at": _now().isoformat(),
+            })
+            log.info(f"Demo user seeded: {demo_email}")
+        elif not verify_password(demo_password, existing.get("password_hash", "")):
+            await db.users.update_one(
+                {"email": demo_email},
+                {"$set": {"password_hash": hash_password(demo_password)}},
+            )
+            log.info(f"Demo user password refreshed: {demo_email}")
+
     log.info("InsightLens API started.")
 
 

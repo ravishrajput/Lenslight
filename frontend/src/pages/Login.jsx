@@ -91,6 +91,21 @@ export default function Login() {
             <span>Continue with Google</span>
           </button>
 
+          <button
+            type="button"
+            onClick={() => {
+              setMode("login");
+              setEmail("demo@insightlens.app");
+              setPassword("demo1234");
+              setError("");
+            }}
+            data-testid="fill-demo-creds-btn"
+            className="w-full mb-5 flex items-center justify-center gap-2 border border-dashed border-[#F24E1E]/50 py-2.5 text-xs font-mono tracking-widest uppercase text-[#F24E1E] hover:bg-[#F24E1E]/5 hover:border-[#F24E1E]"
+            style={{ transitionProperty: "background-color, border-color" }}
+          >
+            Use demo credentials →
+          </button>
+
           <div className="flex items-center gap-3 mb-5">
             <div className="h-px bg-white/10 flex-1" />
             <span className="font-mono text-[10px] text-neutral-500 tracking-widest">OR WITH EMAIL</span>
