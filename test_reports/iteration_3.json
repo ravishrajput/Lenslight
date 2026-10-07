@@ -1,0 +1,31 @@
+{
+  "summary": "Full backend + frontend test of Weekly Digest feature. 7/7 pytest tests pass: GET /api/digests/me returns correct seeded prefs (digest_email=delivered@resend.dev); POST /api/digests/subscribe toggles true/false and persists; POST /api/digests/preview enqueues and within ~30s a digest_runs row with status='sent' and a Resend email_id appears in Mongo; POST /api/cron/weekly-digest returns 401 w/o auth and w/ wrong bearer, returns 2xx (<1s) with correct Bearer+X-Webhook-Id, returns {status:'duplicate'} on repeat with same X-Webhook-Id, and dispatches a background send that records a digest_runs row (status='sent'). Frontend: login via demo creds, sidebar WEEKLY DIGEST button opens modal, email field pre-filled with delivered@resend.dev, toggle shows ACTIVE, 'Send preview now' click produces green queued status, X button closes modal, reopen persists state.",
+  "backend_issues": {"critical": [], "minor": [
+    {"endpoint": "/api/digests/preview", "issue": "Response returns 'email': user['email'] (account email) but the digest is actually delivered to digest_email. Frontend displays this account email in the 'Queued — sent to X' status, which can confuse users whose digest_email differs. Consider returning digest_email instead."}
+  ]},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "DigestSettings modal", "issues": ["Status toast says 'sent to demo@insightlens.app' when actual delivery address is delivered@resend.dev — mismatch with the 'Deliver to' field shown just above."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_digests.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "(Minor UX) /api/digests/preview should echo digest_email (not account email) so the modal status message matches the Deliver-to field."
+  ],
+  "critical_code_review_comments": [
+    "server.py cron endpoint correctly uses hmac.compare_digest for secret comparison and acks <1s before enqueuing BackgroundTasks — matches playbook.",
+    "Idempotency implemented via unique insert into cron_runs keyed on X-Webhook-Id/run_id — works. Consider adding a unique index on cron_runs.run_id to avoid race in concurrent duplicate deliveries.",
+    "_send_digest_task gracefully records status='error' row on exception — observability is good.",
+    "email_service._assert_safe_email implements G1-G5 guardrails including form/credential prompt/URL host checks — solid.",
+    "digest_service.generate_and_send_digest uses session_id of digest_{user_id}_{YYYYWW} so cache keys are per-week per-user — good."
+  ],
+  "updated_files": ["/app/backend/tests/test_digests.py"],
+  "success_rate": {"backend": "100% (7/7)", "frontend": "100% (all scripted interactions passed)"},
+  "test_credentials": "demo@insightlens.app / demo1234 (seed is idempotent in server.py startup)",
+  "seed_data_creation": "None (relied on seeded demo user with digest_email=delivered@resend.dev)",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Weekly Digest fully working end-to-end. Resend proxy accepts delivered@resend.dev; emails return a real email_id. Cron webhook ack <1s. Only cosmetic finding: /api/digests/preview response echoes account email in 'email' field instead of digest_email, which makes the modal queued-toast misreport the destination."
+}

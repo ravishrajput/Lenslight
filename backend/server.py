@@ -381,7 +381,7 @@ async def _send_digest_task(user_id: str):
 @api.post("/digests/preview")
 async def preview_digest(background: BackgroundTasks, user=Depends(current_user)):
     background.add_task(_send_digest_task, user["user_id"])
-    return {"status": "queued", "email": user["email"]}
+    return {"status": "queued", "email": user.get("digest_email") or user["email"]}
 
 
 # ---------- Cron Webhook ----------
