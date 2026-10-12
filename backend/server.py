@@ -23,7 +23,6 @@ from pydantic import BaseModel, EmailStr, Field
 
 from auth_utils import hash_password, verify_password, create_access_token, get_current_user
 from data_sources import fetch_sources_for_question
-from mock_data import build_artifacts
 from llm_service import analyze, stream_analyze
 from pdf_service import build_report_pdf
 from digest_service import generate_and_send_digest
@@ -82,6 +81,64 @@ def _set_session_cookie(resp: Response, token: str):
 
 async def current_user(request: Request):
     return await get_current_user(request, db)
+
+
+def build_artifacts(sources_data: list[dict]) -> list[dict]:
+    """Convert live source payloads into frontend-renderable cards without relying on mock data."""
+    artifacts: list[dict] = []
+    for source_data in sources_data or []:
+        source_name = source_data.get("source", "unknown")
+        time_series = source_data.get("time_series")
+        if isinstance(time_series, list) and time_series:
+            row = time_series[0]
+            x_key = "time" if "time" in row else "date" if "date" in row else None
+            if x_key is None:
+                for key in ("event_time", "timestamp", "created_at"):
+                    if key in row:
+                        x_key = key
+                        break
+            if x_key is None:
+                x_key = next((k for k in row.keys() if k not in {"source", "sql", "spl"}), None)
+            if x_key is not None:
+                y_keys = [
+                    key for key in row.keys()
+                    if key not in {x_key, "source", "sql", "spl", "time", "date", "timestamp", "event_time", "created_at"}
+                    and isinstance(row.get(key), (int, float))
+                ]
+                if y_keys:
+                    artifacts.append({
+                        "type": "chart",
+                        "chart_type": "bar" if source_name == "splunk" else "line",
+                        "title": f"{source_name.upper()} — Trend",
+                        "x_key": x_key,
+                        "y_keys": y_keys,
+                        "data": time_series,
+                    })
+
+        for table_key, label in (
+            ("funnel", "Checkout funnel"),
+            ("top_errors", "Top errors driving abandonment"),
+            ("top_services", "Top services by error count"),
+            ("latency_table", "Service latency"),
+            ("markets", "Market breakdown"),
+            ("devices", "Device breakdown"),
+            ("payment_methods", "Payment method performance"),
+            ("channel_breakdown", "Channel breakdown"),
+        ):
+            rows = source_data.get(table_key)
+            if isinstance(rows, list):
+                artifacts.append({"type": "table", "title": label, "rows": rows})
+
+        query = source_data.get("spl") or source_data.get("sql")
+        if query:
+            artifacts.append({
+                "type": "query",
+                "title": f"{source_name.upper()} query",
+                "language": "spl" if source_name == "splunk" else "sql",
+                "code": query,
+            })
+
+    return artifacts
 
 
 # ---------- Pydantic ----------
@@ -164,10 +221,10 @@ async def me(user=Depends(current_user)):
 async def list_connections(user=Depends(current_user)):
     return {
         "connections": [
-            {"id": "splunk", "name": "Splunk Enterprise", "status": "connected", "mode": "mock",
-             "accent": "#F24E1E", "endpoint": "https://splunk.internal:8089",
+            {"id": "splunk", "name": "Splunk Enterprise", "status": "connected", "mode": "live",
+             "accent": "#F24E1E", "endpoint": os.environ.get("SPLUNK_HOST", "https://splunk.internal:8089"),
              "description": "Operational log analytics & SIEM. Query via SPL."},
-            {"id": "bigquery", "name": "Google BigQuery", "status": "connected", "mode": "mock",
+            {"id": "bigquery", "name": "Google BigQuery", "status": "connected", "mode": "live",
              "accent": "#007AFF", "endpoint": "bigquery.googleapis.com",
              "description": "Serverless warehouse for analytical SQL."},
         ]
