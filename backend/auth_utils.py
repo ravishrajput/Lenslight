@@ -38,7 +38,7 @@ def decode_token(token: str) -> dict:
 
 
 async def get_current_user(request: Request, db) -> dict:
-    # 1) emergent session cookie
+    # 1) stored session cookie
     session_token = request.cookies.get("session_token")
     if session_token:
         sess = await db.user_sessions.find_one({"session_token": session_token}, {"_id": 0})

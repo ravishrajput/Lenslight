@@ -1,4 +1,4 @@
-"""Emergent-managed email sender with the Resend playbook's G1-G5 guardrails."""
+"""Email sender with safety checks for outbound notification templates."""
 import os
 import re
 import ipaddress
@@ -11,8 +11,8 @@ from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
 
-EMAIL_BASE_URL = "https://integrations.emergentagent.com"
-EMAIL_KEY = os.environ.get("EMERGENT_EMAIL_KEY")
+EMAIL_BASE_URL = "https://api.resend.com"
+EMAIL_KEY = os.environ.get("EMAIL_API_KEY") or os.environ.get("EMAIL_KEY")
 EMAIL_FROM_NAME = os.environ.get("EMAIL_FROM_NAME", "Lenslight")
 EMAIL_REPLY_TO = os.environ.get("EMAIL_REPLY_TO")
 
@@ -95,7 +95,7 @@ def _assert_safe_email(subject: str, html: str) -> None:
 async def send_email(*, to: str, subject: str, html: str, reply_to: Optional[str] = None) -> Optional[str]:
     _assert_safe_email(subject, html)
     if not EMAIL_KEY:
-        logger.error("EMERGENT_EMAIL_KEY not configured")
+        logger.error("EMAIL_API_KEY not configured")
         raise HTTPException(status_code=500, detail="Email service not configured")
     payload = {"to": [to], "subject": subject, "html": html, "from_name": EMAIL_FROM_NAME}
     if reply_to or EMAIL_REPLY_TO:

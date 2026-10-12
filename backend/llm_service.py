@@ -1,4 +1,4 @@
-"""LLM service for Gemini analysis with Anthropic and emergent fallbacks."""
+"""LLM service for Gemini analysis with Anthropic fallback support."""
 import asyncio
 import json
 import os
@@ -20,14 +20,6 @@ try:
     from anthropic import AsyncAnthropic
 except Exception:  # pragma: no cover
     AsyncAnthropic = None
-
-try:
-    from emergentintegrations.llm.chat import LlmChat, UserMessage, TextDelta, StreamDone
-except Exception:  # pragma: no cover
-    LlmChat = None
-    UserMessage = None
-    TextDelta = None
-    StreamDone = None
 
 SYSTEM_PROMPT = """You are Lenslight, an expert data analyst for a retail e-commerce business. You investigate operational and commercial metrics across Splunk (frontend event logs, service logs, errors, latency) and BigQuery (orders, sessions, markets, devices, payments).
 
@@ -108,9 +100,9 @@ async def _stream_with_gemini(question: str, sources_data: list[dict]):
 async def _analyze_with_anthropic(question: str, sources_data: list[dict]) -> str:
     if AsyncAnthropic is None:
         raise RuntimeError("anthropic package is not installed")
-    api_key = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("EMERGENT_LLM_KEY")
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
-        raise RuntimeError("ANTHROPIC_API_KEY or EMERGENT_LLM_KEY is not configured")
+        raise RuntimeError("ANTHROPIC_API_KEY is not configured")
 
     client = AsyncAnthropic(api_key=api_key)
     response = await client.messages.create(
@@ -132,9 +124,9 @@ async def _analyze_with_anthropic(question: str, sources_data: list[dict]) -> st
 async def _stream_with_anthropic(question: str, sources_data: list[dict]):
     if AsyncAnthropic is None:
         raise RuntimeError("anthropic package is not installed")
-    api_key = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("EMERGENT_LLM_KEY")
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
-        raise RuntimeError("ANTHROPIC_API_KEY or EMERGENT_LLM_KEY is not configured")
+        raise RuntimeError("ANTHROPIC_API_KEY is not configured")
 
     client = AsyncAnthropic(api_key=api_key)
     async with client.messages.stream(
@@ -147,27 +139,13 @@ async def _stream_with_anthropic(question: str, sources_data: list[dict]):
             yield text
 
 
-def _build_chat(session_id: str):
-    if LlmChat is None:
-        raise RuntimeError("emergentintegrations is not installed")
-    api_key = os.environ.get("EMERGENT_LLM_KEY") or os.environ.get("ANTHROPIC_API_KEY") or _gemini_api_key()
-    if not api_key:
-        raise RuntimeError("No LLM API key configured")
-    return LlmChat(
-        api_key=api_key, session_id=session_id, system_message=SYSTEM_PROMPT
-    ).with_model("anthropic", "claude-sonnet-5-5")
-
-
 async def analyze(question: str, sources_data: list[dict], session_id: str) -> str:
     try:
         if _gemini_api_key():
             return await _analyze_with_gemini(question, sources_data)
-        if os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("EMERGENT_LLM_KEY"):
-            if os.environ.get("ANTHROPIC_API_KEY"):
-                return await _analyze_with_anthropic(question, sources_data)
-        chat = _build_chat(session_id)
-        reply = await chat.send_message(UserMessage(text=_build_prompt(question, sources_data)))
-        return reply if isinstance(reply, str) else str(reply)
+        if os.environ.get("ANTHROPIC_API_KEY"):
+            return await _analyze_with_anthropic(question, sources_data)
+        raise RuntimeError("No LLM API key configured")
     except Exception as e:
         return (
             f"**Unable to reach the analysis model right now.** ({type(e).__name__})\n\n"
@@ -187,13 +165,7 @@ async def stream_analyze(question: str, sources_data: list[dict], session_id: st
             async for chunk in _stream_with_anthropic(question, sources_data):
                 yield chunk
             return
-        chat = _build_chat(session_id)
-        async for event in chat.stream_message(UserMessage(text=_build_prompt(question, sources_data))):
-            if isinstance(event, TextDelta):
-                if event.content:
-                    yield event.content
-            elif isinstance(event, StreamDone):
-                break
+        raise RuntimeError("No LLM API key configured")
     except Exception:
         fallback = "\n\n**Model stream interrupted.** The query results are still shown below."
         yield fallback

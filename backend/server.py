@@ -159,52 +159,6 @@ async def me(user=Depends(current_user)):
     return {"user_id": user["user_id"], "email": user["email"], "name": user["name"], "picture": user.get("picture")}
 
 
-@api.post("/auth/google/session")
-async def google_session(request: Request, response: Response):
-    session_id = request.headers.get("X-Session-ID")
-    if not session_id:
-        body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
-        session_id = body.get("session_id")
-    if not session_id:
-        raise HTTPException(status_code=400, detail="Missing session_id")
-    async with httpx.AsyncClient(timeout=15.0) as http:
-        r = await http.get(
-            "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
-            headers={"X-Session-ID": session_id},
-        )
-    if r.status_code != 200:
-        raise HTTPException(status_code=401, detail="Invalid session")
-    data = r.json()
-    email = (data.get("email") or "").lower()
-    name = data.get("name") or email
-    picture = data.get("picture")
-    session_token = data["session_token"]
-
-    user = await db.users.find_one({"email": email}, {"_id": 0})
-    if user is None:
-        user_id = f"user_{uuid.uuid4().hex[:12]}"
-        await db.users.insert_one({
-            "user_id": user_id,
-            "email": email,
-            "name": name,
-            "picture": picture,
-            "provider": "google",
-            "created_at": _now().isoformat(),
-        })
-    else:
-        user_id = user["user_id"]
-        await db.users.update_one({"user_id": user_id}, {"$set": {"name": name, "picture": picture}})
-
-    await db.user_sessions.insert_one({
-        "user_id": user_id,
-        "session_token": session_token,
-        "expires_at": (_now() + timedelta(days=7)).isoformat(),
-        "created_at": _now().isoformat(),
-    })
-    _set_session_cookie(response, session_token)
-    return {"user_id": user_id, "email": email, "name": name, "picture": picture}
-
-
 # ---------- Connections ----------
 @api.get("/connections")
 async def list_connections(user=Depends(current_user)):
