@@ -4,6 +4,7 @@ market/region filters (e.g. "US", "EMEA") and relative time windows ("yesterday"
 import random
 import re
 from datetime import datetime, timezone, timedelta
+from typing import Optional
 
 
 MARKETS = ["US", "CA", "UK", "DE", "FR", "IN", "AU", "JP", "BR"]
@@ -14,7 +15,7 @@ def _seed(q: str):
     random.seed(abs(hash(q.lower())) % (10**8))
 
 
-def _detect_market(q: str) -> str | None:
+def _detect_market(q: str) -> Optional[str]:
     ql = q.lower()
     aliases = {
         "US": ["us", "u.s", "usa", "united states", "america"],

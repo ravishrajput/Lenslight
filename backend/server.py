@@ -13,6 +13,7 @@ import logging
 import httpx
 from datetime import datetime, timezone, timedelta
 from typing import Optional
+from urllib.parse import urlparse
 
 from fastapi import FastAPI, APIRouter, Response, Request, HTTPException, Depends, Query, BackgroundTasks
 from fastapi.responses import StreamingResponse
@@ -21,15 +22,16 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, EmailStr, Field
 
 from auth_utils import hash_password, verify_password, create_access_token, get_current_user
-from mock_data import splunk_mock, bigquery_mock, build_artifacts
+from data_sources import fetch_sources_for_question
+from mock_data import build_artifacts
 from llm_service import analyze, stream_analyze
 from pdf_service import build_report_pdf
 from digest_service import generate_and_send_digest
 
 # ----- Mongo -----
-mongo_url = os.environ["MONGO_URL"]
+mongo_url = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
 client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ["DB_NAME"]]
+db = client[os.environ.get("DB_NAME", "lenslight")]
 
 app = FastAPI(title="Lenslight API")
 api = APIRouter(prefix="/api")
@@ -42,12 +44,40 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _cookie_settings():
+    frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+    host = urlparse(frontend_url).hostname or ""
+    local_host = host in {"localhost", "127.0.0.1", "0.0.0.0"} or host.endswith(".local")
+    return {
+        "secure": not local_host,
+        "samesite": "lax" if local_host else "none",
+    }
+
+
 def _set_jwt_cookie(resp: Response, token: str):
-    resp.set_cookie("access_token", token, httponly=True, secure=True, samesite="none", max_age=7 * 24 * 3600, path="/")
+    cookie_cfg = _cookie_settings()
+    resp.set_cookie(
+        "access_token",
+        token,
+        httponly=True,
+        secure=cookie_cfg["secure"],
+        samesite=cookie_cfg["samesite"],
+        max_age=7 * 24 * 3600,
+        path="/",
+    )
 
 
 def _set_session_cookie(resp: Response, token: str):
-    resp.set_cookie("session_token", token, httponly=True, secure=True, samesite="none", max_age=7 * 24 * 3600, path="/")
+    cookie_cfg = _cookie_settings()
+    resp.set_cookie(
+        "session_token",
+        token,
+        httponly=True,
+        secure=cookie_cfg["secure"],
+        samesite=cookie_cfg["samesite"],
+        max_age=7 * 24 * 3600,
+        path="/",
+    )
 
 
 async def current_user(request: Request):
@@ -272,13 +302,7 @@ async def send_message(chat_id: str, payload: SendMessageIn, user=Depends(curren
     await db.messages.insert_one(user_msg)
     user_msg.pop("_id", None)
 
-    # Query mock data sources
-    sources_data = []
-    if "splunk" in payload.sources:
-        sources_data.append(splunk_mock(payload.content))
-    if "bigquery" in payload.sources:
-        sources_data.append(bigquery_mock(payload.content))
-
+    sources_data = await fetch_sources_for_question(payload.content, payload.sources)
     artifacts = build_artifacts(sources_data)
 
     # Call LLM
@@ -331,11 +355,7 @@ async def send_message_stream(chat_id: str, payload: SendMessageIn, user=Depends
         user_msg.pop("_id", None)
         yield sse({"type": "user_message", "data": user_msg})
 
-        sources_data = []
-        if "splunk" in payload.sources:
-            sources_data.append(splunk_mock(payload.content))
-        if "bigquery" in payload.sources:
-            sources_data.append(bigquery_mock(payload.content))
+        sources_data = await fetch_sources_for_question(payload.content, payload.sources)
         artifacts = build_artifacts(sources_data)
 
         assistant_id = f"msg_{uuid.uuid4().hex[:12]}"
