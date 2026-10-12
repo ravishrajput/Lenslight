@@ -1,5 +1,7 @@
 import asyncio
 
+import pytest
+
 from data_sources import (
     _bigquery_table_ref,
     _build_bigquery_sql,
@@ -25,13 +27,11 @@ def test_bigquery_sql_uses_checkout_events_for_funnel_questions(monkeypatch):
     assert "session_id" in sql
 
 
-def test_splunk_uses_mock_when_envs_missing():
-    data = asyncio.run(fetch_splunk_data("Why did checkout rate drop yesterday in the US?"))
-    assert data["source"] == "splunk"
-    assert "time_series" in data or "funnel" in data
+def test_splunk_requires_real_config():
+    with pytest.raises(RuntimeError, match="real Splunk"):
+        asyncio.run(fetch_splunk_data("Why did checkout rate drop yesterday in the US?"))
 
 
-def test_bigquery_uses_mock_when_envs_missing():
-    data = asyncio.run(fetch_bigquery_data("Summarize revenue by market last week"))
-    assert data["source"] == "bigquery"
-    assert "time_series" in data or "markets" in data
+def test_bigquery_requires_real_config():
+    with pytest.raises(RuntimeError, match="real BigQuery"):
+        asyncio.run(fetch_bigquery_data("Summarize revenue by market last week"))

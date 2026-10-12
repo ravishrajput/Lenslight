@@ -6,8 +6,6 @@ from typing import Any, Optional
 
 import httpx
 
-from mock_data import bigquery_mock, splunk_mock
-
 log = logging.getLogger(__name__)
 
 
@@ -191,14 +189,14 @@ async def fetch_splunk_data(question: str) -> dict[str, Any]:
     real = await _fetch_splunk_real(question)
     if real is not None:
         return real
-    return splunk_mock(question)
+    raise RuntimeError("No real Splunk configuration is available; mock mode is disabled.")
 
 
 async def fetch_bigquery_data(question: str) -> dict[str, Any]:
     real = await _fetch_bigquery_real(question)
     if real is not None:
         return real
-    return bigquery_mock(question)
+    raise RuntimeError("No real BigQuery configuration is available; mock mode is disabled.")
 
 
 async def fetch_sources_for_question(question: str, selected_sources: list[str]) -> list[dict[str, Any]]:
