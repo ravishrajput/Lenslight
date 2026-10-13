@@ -1,19 +1,20 @@
 # Lenslight
 
-Lenslight is a dark-mode AI analytics app for investigating Splunk and BigQuery data through a chat interface. It connects a FastAPI backend with a React frontend and uses an LLM to turn operational + warehouse data into a concise investigation report.
+Lenslight is an AI analytics app with a React frontend and FastAPI backend. Chat can analyze the bundled local event-log CSV together with BigQuery warehouse results and produce a concise investigation report.
 
 ## What is already implemented
 - FastAPI backend with auth, chat history, streaming responses, PDF export, and scheduled digest emails
 - Mongo-based persistence for users, chats, messages, and sessions
-- Mock Splunk and BigQuery data sources to simulate real data analysis
-- LLM report generation via the Emergent LLM integration
+- Bundled six-month local event-log dataset with checkout, address, latency, and failure records
+- Optional BigQuery queries for warehouse metrics
+- LLM report generation using Gemini, with Anthropic as an optional fallback
 - React frontend with login, chat flow, connections page, and digest settings
 
 ## Required services
 Before deployment, you need:
 - MongoDB database (Mongo Atlas or local MongoDB)
-- Emergent LLM API key
-- Emergent email API key for weekly digest emails
+- Gemini API key (or an Anthropic API key as an alternative)
+- Email API key if weekly digest delivery is enabled
 - A frontend origin and backend URL for CORS and deep links
 
 ## Local setup
@@ -27,11 +28,12 @@ Then set real values for:
 - MONGO_URL
 - DB_NAME
 - JWT_SECRET
-- EMERGENT_LLM_KEY
+- GEMINI_API_KEY
+- GEMINI_MODEL
 - WEBHOOK_CRON_SECRET
 - FRONTEND_URL
 - DEMO_EMAIL / DEMO_PASSWORD
-- EMERGENT_EMAIL_KEY
+- EMAIL_API_KEY (optional)
 
 ### 2) Create frontend environment file
 cp frontend/.env.example frontend/.env
@@ -61,7 +63,7 @@ The UI should open on http://localhost:3000 and the API will be on http://localh
 
 Deploy the FastAPI backend as a Docker web service and the React frontend as a static site. Render connects to GitHub and deploys on pushes, so no cloud CLI or custom GitHub Actions workflow is needed. MongoDB remains external; use MongoDB Atlas.
 
-Chat analysis and weekly digests use the bundled local dataset at `backend/data/splunk_events.csv`; they do not require Splunk or BigQuery credentials. To replace the dataset, update that CSV and redeploy the backend. `backend/scripts/generate_splunk_sample.py` regenerates the six-month sample both there and in `samples/splunk_events.csv`.
+Chat defaults to both the bundled local dataset and BigQuery. The CSV is at `backend/data/splunk_events.csv`; to replace it, update that file and redeploy the backend. `backend/scripts/generate_splunk_sample.py` regenerates the six-month sample in both that location and `samples/splunk_events.csv`. Weekly digests use the local CSV.
 
 ### 1) Deploy the backend
 
@@ -81,6 +83,12 @@ Add these environment variables in the service settings:
 - `GEMINI_API_KEY`: Google AI Studio API key
 - `GEMINI_MODEL`: `gemini-2.0-flash`
 - `FRONTEND_URL`: leave unset until the frontend is deployed
+- `GCP_PROJECT_ID` and `GOOGLE_CLOUD_PROJECT`: Google Cloud project ID
+- `BQ_DATASET`: BigQuery dataset name
+- `BQ_TABLE`: BigQuery orders table name
+- `GOOGLE_APPLICATION_CREDENTIALS`: `/etc/secrets/gcp-service-account.json`
+
+In the backend service's **Environment → Secret Files**, add `gcp-service-account.json` containing a Google service-account key JSON. Do not commit this file or put it in the frontend. Enable the BigQuery API and grant the service account **BigQuery Job User** on the project and **BigQuery Data Viewer** on the dataset. BigQuery is optional; users can turn off its source in chat to analyze the local CSV only.
 
 Optional backend variables: `WEBHOOK_CRON_SECRET`, `DEMO_EMAIL`, `DEMO_PASSWORD`, `EMAIL_API_KEY`, `EMAIL_FROM_NAME`, and `EMAIL_REPLY_TO`.
 
@@ -108,12 +116,5 @@ After setup, Render automatically redeploys each service when its configured bra
 ## Production notes
 
 - Keep `.env` files and credentials out of version control; use GitHub secrets for deployment values.
-- The default analysis source is the bundled static CSV; live cloud connectors are not used by chat or digests.
+- Chat can combine local CSV findings with BigQuery results; if BigQuery is unavailable, the report should disclose that and continue with local findings.
 - Keep each service's environment variables configured in Render; the frontend API URL is a build-time value.
-
-## Current status
-The project is structurally complete and the main real blocker I found was a frontend dependency mismatch:
-- `date-fns` was set to 4.1.0 while `react-day-picker` expects 2.x/3.x.
-- That has been corrected in the project to a compatible version.
-
-After you fill in your .env files and install the app dependencies, it is ready to run and deploy.
