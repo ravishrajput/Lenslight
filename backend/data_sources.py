@@ -1,7 +1,12 @@
 import base64
+import csv
 import json
 import logging
 import os
+import re
+from collections import Counter, defaultdict
+from datetime import date, timedelta
+from pathlib import Path
 from typing import Any, Optional
 
 import httpx
@@ -11,6 +16,149 @@ log = logging.getLogger(__name__)
 
 def _question_lower(question: str) -> str:
     return (question or "").lower()
+
+
+def _local_logs_path() -> Path:
+    default_path = Path(__file__).resolve().parent / "data" / "splunk_events.csv"
+    return Path(os.getenv("LOCAL_LOGS_CSV", str(default_path)))
+
+
+def _filter_local_logs(question: str, rows: list[dict[str, str]]) -> tuple[list[dict[str, str]], list[str]]:
+    q = _question_lower(question)
+    filters = []
+    address_question = any(term in q for term in ("address", "postal", "postcode", "zip code"))
+    checkout_question = any(term in q for term in ("checkout", "cart", "conversion", "funnel"))
+
+    if address_question:
+        rows = [row for row in rows if row["event"] in {"address_added", "address_validation_failed"}]
+        filters.append("address outcomes")
+    elif checkout_question:
+        checkout_events = {
+            "add_to_cart",
+            "checkout_started",
+            "address_added",
+            "address_validation_failed",
+            "shipping_info_entered",
+            "payment_info_entered",
+            "order_placed",
+        }
+        rows = [row for row in rows if row["event"] in checkout_events]
+        filters.append("checkout events")
+
+    if any(term in q for term in ("error", "exception", "fail", "failure")):
+        rows = [row for row in rows if row["level"] in {"ERROR", "FATAL"}]
+        filters.append("error-level events")
+
+    selected_market = next(
+        (market for market in ("US", "UK", "DE", "CA") if re.search(rf"\b{market.lower()}\b", q)),
+        None,
+    )
+    if selected_market:
+        rows = [row for row in rows if row["market"] == selected_market]
+        filters.append(f"market {selected_market}")
+
+    days_match = re.search(r"(?:last|past)\s+(\d+)\s+days?", q)
+    days = int(days_match.group(1)) if days_match else None
+    if days is None and any(term in q for term in ("last week", "past week", "this week")):
+        days = 7
+    if "yesterday" in q:
+        days = 1
+    if days and rows:
+        latest_day = date.fromisoformat(max(row["timestamp"][:10] for row in rows))
+        start_day = latest_day - timedelta(days=days - 1)
+        rows = [row for row in rows if date.fromisoformat(row["timestamp"][:10]) >= start_day]
+        filters.append(f"last {days} days in the CSV")
+
+    return rows, filters or ["all events"]
+
+
+def _summarize_local_logs(question: str, rows: list[dict[str, str]]) -> dict[str, Any]:
+    filtered_rows, filters = _filter_local_logs(question, rows)
+    event_groups: dict[tuple[str, str, str], list[dict[str, str]]] = defaultdict(list)
+    market_groups: dict[str, list[dict[str, str]]] = defaultdict(list)
+    daily_groups: dict[str, list[dict[str, str]]] = defaultdict(list)
+    error_groups: dict[tuple[str, str, str, str], int] = Counter()
+
+    for row in filtered_rows:
+        event_groups[(row["event"], row["source"], row["market"])].append(row)
+        market_groups[row["market"]].append(row)
+        daily_groups[row["timestamp"][:10]].append(row)
+        if row["level"] in {"ERROR", "FATAL"}:
+            key = (row["error_code"], row["error_message"], row["source"], row["market"])
+            error_groups[key] += 1
+
+    event_summary = []
+    for (event, source, market), group in sorted(event_groups.items()):
+        latencies = [int(row["response_time"]) for row in group if row["response_time"]]
+        event_summary.append({
+            "event": event,
+            "source": source,
+            "market": market,
+            "count": len(group),
+            "failures": sum(row["level"] in {"ERROR", "FATAL"} for row in group),
+            "avg_response_time_ms": round(sum(latencies) / len(latencies), 1) if latencies else 0,
+        })
+
+    markets = []
+    for market, group in sorted(market_groups.items()):
+        checkouts = sum(row["event"] == "checkout_started" for row in group)
+        orders = [row for row in group if row["event"] == "order_placed" and row["level"] == "INFO"]
+        revenue = sum(float(row["order_value"]) for row in orders if row["order_value"])
+        markets.append({
+            "market": market,
+            "checkout_starts": checkouts,
+            "orders": len(orders),
+            "address_failures": sum(row["event"] == "address_validation_failed" for row in group),
+            "completion_rate_pct": round(len(orders) / checkouts * 100, 1) if checkouts else 0,
+            "revenue_usd": round(revenue, 2),
+        })
+
+    time_series = []
+    for day, group in sorted(daily_groups.items()):
+        orders = [row for row in group if row["event"] == "order_placed" and row["level"] == "INFO"]
+        time_series.append({
+            "date": day,
+            "events": len(group),
+            "errors": sum(row["level"] in {"ERROR", "FATAL"} for row in group),
+            "orders": len(orders),
+            "revenue_usd": round(sum(float(row["order_value"]) for row in orders if row["order_value"]), 2),
+        })
+
+    top_errors = [
+        {"error_code": code, "error_message": message, "source": source, "market": market, "events": count}
+        for (code, message, source, market), count in sorted(error_groups.items(), key=lambda item: item[1], reverse=True)
+    ]
+    examples = [
+        {key: row[key] for key in ("timestamp", "event", "level", "source", "market", "session_id", "error_code", "error_message")}
+        for row in filtered_rows
+        if row["level"] in {"ERROR", "FATAL"}
+    ][:12]
+
+    return {
+        "source": "local_logs",
+        "spl": f"CSV filters: {', '.join(filters)}",
+        "filters": filters,
+        "total_events": len(filtered_rows),
+        "total_errors": sum(row["level"] in {"ERROR", "FATAL"} for row in filtered_rows),
+        "event_summary": event_summary,
+        "funnel": event_summary,
+        "top_errors": top_errors,
+        "markets": markets,
+        "time_series": time_series,
+        "log_examples": examples,
+    }
+
+
+async def fetch_local_logs_data(question: str) -> dict[str, Any]:
+    path = _local_logs_path()
+    try:
+        with path.open(newline="", encoding="utf-8") as csv_file:
+            rows = list(csv.DictReader(csv_file))
+    except OSError as exc:
+        raise RuntimeError(f"Local logs CSV could not be read: {path}") from exc
+    if not rows:
+        raise RuntimeError(f"Local logs CSV has no events: {path}")
+    return _summarize_local_logs(question, rows)
 
 
 def _has_real_splunk() -> bool:
@@ -205,6 +353,8 @@ async def fetch_bigquery_data(question: str) -> dict[str, Any]:
 
 async def fetch_sources_for_question(question: str, selected_sources: list[str]) -> list[dict[str, Any]]:
     result = []
+    if "local_logs" in selected_sources:
+        result.append(await fetch_local_logs_data(question))
     if "splunk" in selected_sources:
         result.append(await fetch_splunk_data(question))
     if "bigquery" in selected_sources:

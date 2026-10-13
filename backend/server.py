@@ -108,14 +108,15 @@ def build_artifacts(sources_data: list[dict]) -> list[dict]:
                 if y_keys:
                     artifacts.append({
                         "type": "chart",
-                        "chart_type": "bar" if source_name == "splunk" else "line",
-                        "title": f"{source_name.upper()} — Trend",
+                        "chart_type": "bar" if source_name in {"splunk", "local_logs"} else "line",
+                        "title": f"{source_name.replace('_', ' ').upper()} — Trend",
                         "x_key": x_key,
                         "y_keys": y_keys,
                         "data": time_series,
                     })
 
         for table_key, label in (
+            ("event_summary", "Local event summary"),
             ("funnel", "Checkout funnel"),
             ("top_errors", "Top errors driving abandonment"),
             ("top_services", "Top services by error count"),
@@ -124,6 +125,7 @@ def build_artifacts(sources_data: list[dict]) -> list[dict]:
             ("devices", "Device breakdown"),
             ("payment_methods", "Payment method performance"),
             ("channel_breakdown", "Channel breakdown"),
+            ("log_examples", "Example error logs"),
         ):
             rows = source_data.get(table_key)
             if isinstance(rows, list):
@@ -134,7 +136,7 @@ def build_artifacts(sources_data: list[dict]) -> list[dict]:
             artifacts.append({
                 "type": "query",
                 "title": f"{source_name.upper()} query",
-                "language": "spl" if source_name == "splunk" else "sql",
+                "language": "spl" if source_name == "splunk" else "csv" if source_name == "local_logs" else "sql",
                 "code": query,
             })
 
@@ -163,7 +165,7 @@ class ChatRenameIn(BaseModel):
 
 class SendMessageIn(BaseModel):
     content: str
-    sources: list[str] = Field(default_factory=lambda: ["bigquery"])
+    sources: list[str] = Field(default_factory=lambda: ["local_logs"])
 
 
 class DigestSubscribeIn(BaseModel):
@@ -221,12 +223,9 @@ async def me(user=Depends(current_user)):
 async def list_connections(user=Depends(current_user)):
     return {
         "connections": [
-            {"id": "splunk", "name": "Splunk Enterprise", "status": "connected", "mode": "live",
-             "accent": "#F24E1E", "endpoint": os.environ.get("SPLUNK_HOST", "https://splunk.internal:8089"),
-             "description": "Operational log analytics & SIEM. Query via SPL."},
-            {"id": "bigquery", "name": "Google BigQuery", "status": "connected", "mode": "live",
-             "accent": "#007AFF", "endpoint": "bigquery.googleapis.com",
-             "description": "Serverless warehouse for analytical SQL."},
+            {"id": "local_logs", "name": "Local CSV logs", "status": "ready", "mode": "static",
+             "accent": "#00E676", "endpoint": "bundled dataset",
+             "description": "Six months of sample checkout, address, latency, and error events."},
         ]
     }
 

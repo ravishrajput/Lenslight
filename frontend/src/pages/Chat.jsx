@@ -8,8 +8,7 @@ import {
   Plus, Send, Loader2, Trash2, Pencil, LogOut, Database, ChevronRight, Check, X, Mail
 } from "lucide-react";
 
-const SPLUNK = "#F24E1E";
-const BQ = "#007AFF";
+const LOCAL_LOGS = "#00E676";
 
 function Sidebar({ chats, currentId, onNew, onDelete, onRename, onOpenDigest }) {
   const { user, logout } = useAuth();
@@ -136,31 +135,25 @@ function Sidebar({ chats, currentId, onNew, onDelete, onRename, onOpenDigest }) 
   );
 }
 
-function SourceChip({ id, active, onToggle }) {
-  const color = id === "splunk" ? SPLUNK : BQ;
+function SourceChip() {
   return (
-    <button
-      type="button"
-      onClick={() => onToggle(id)}
-      data-testid={`source-chip-${id}`}
-      className={`font-mono text-[10px] uppercase tracking-widest px-2.5 py-1 border ${active ? "" : "opacity-40"}`}
-      style={{ borderColor: color, color: active ? color : "#737373", transitionProperty: "opacity" }}
+    <span
+      data-testid="source-chip-local_logs"
+      className="font-mono text-[10px] uppercase tracking-widest px-2.5 py-1 border"
+      style={{ borderColor: LOCAL_LOGS, color: LOCAL_LOGS }}
     >
-      {id === "splunk" ? "SPLUNK" : "BIGQUERY"}
-    </button>
+      LOCAL CSV
+    </span>
   );
 }
 
 function Composer({ onSend, busy }) {
   const [text, setText] = useState("");
-  const [sources, setSources] = useState(["bigquery"]);
-
-  const toggle = (s) => setSources((cur) => (cur.includes(s) ? cur.filter((x) => x !== s) : [...cur, s]));
 
   const submit = (e) => {
     e.preventDefault();
-    if (!text.trim() || busy || sources.length === 0) return;
-    onSend(text.trim(), sources);
+    if (!text.trim() || busy) return;
+    onSend(text.trim(), ["local_logs"]);
     setText("");
   };
 
@@ -173,8 +166,7 @@ function Composer({ onSend, busy }) {
       <div className="max-w-3xl mx-auto">
         <div className="flex items-center gap-2 mb-2">
           <span className="font-mono text-[10px] text-neutral-500 tracking-widest">SOURCES</span>
-          <SourceChip id="splunk" active={sources.includes("splunk")} onToggle={toggle} />
-          <SourceChip id="bigquery" active={sources.includes("bigquery")} onToggle={toggle} />
+          <SourceChip />
         </div>
         <div className="flex items-end gap-2 border border-white/15 bg-[#0f0f0f] focus-within:border-white/40" style={{ transitionProperty: "border-color" }}>
           <textarea
@@ -188,7 +180,7 @@ function Composer({ onSend, busy }) {
           />
           <button
             type="submit"
-            disabled={busy || !text.trim() || sources.length === 0}
+            disabled={busy || !text.trim()}
             data-testid="chat-send-btn"
             className="m-2 bg-white text-black px-3 py-2 disabled:opacity-40 hover:bg-neutral-200"
             style={{ transitionProperty: "background-color" }}
@@ -379,7 +371,7 @@ export default function Chat() {
       <main className="flex-1 flex flex-col h-screen">
         <div ref={scrollRef} className="flex-1 overflow-y-auto" data-testid="chat-transcript">
           {messages.length === 0 && !busy ? (
-            <EmptyState onPick={(text) => onSend(text, ["splunk", "bigquery"])} />
+            <EmptyState onPick={(text) => onSend(text, ["local_logs"])} />
           ) : (
             <div className="max-w-3xl mx-auto px-6 py-4">
               {messages.map((m) => <MessageView key={m.message_id} msg={m} />)}

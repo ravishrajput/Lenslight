@@ -5,7 +5,10 @@ from pathlib import Path
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
-OUTPUT_PATH = ROOT_DIR / "samples" / "splunk_events.csv"
+OUTPUT_PATHS = (
+    ROOT_DIR / "samples" / "splunk_events.csv",
+    ROOT_DIR / "backend" / "data" / "splunk_events.csv",
+)
 START_DATE = date(2026, 4, 13)
 END_DATE = date(2026, 10, 13)
 MARKETS = ("US", "UK", "DE", "CA")
@@ -100,12 +103,14 @@ def generate_events():
 
 
 def main():
-    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with OUTPUT_PATH.open("w", newline="", encoding="utf-8") as output:
-        writer = csv.DictWriter(output, fieldnames=FIELDNAMES)
-        writer.writeheader()
-        writer.writerows(generate_events())
-    print(f"Generated six months of Splunk sample events: {OUTPUT_PATH}")
+    rows = list(generate_events())
+    for output_path in OUTPUT_PATHS:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with output_path.open("w", newline="", encoding="utf-8") as output:
+            writer = csv.DictWriter(output, fieldnames=FIELDNAMES)
+            writer.writeheader()
+            writer.writerows(rows)
+    print(f"Generated six months of local log events: {len(rows)} rows")
 
 
 if __name__ == "__main__":

@@ -9,6 +9,7 @@ import { API } from "@/lib/api";
 
 const SPLUNK = "#F24E1E";
 const BQ = "#007AFF";
+const LOCAL_LOGS = "#00E676";
 const PALETTE = [SPLUNK, BQ, "#00E676", "#FFD60A"];
 
 function Chart({ art }) {
@@ -92,11 +93,13 @@ function DataTable({ art }) {
 
 function Query({ art }) {
   const isSpl = art.language === "spl";
+  const isCsv = art.language === "csv";
+  const color = isSpl ? SPLUNK : isCsv ? LOCAL_LOGS : BQ;
   return (
     <div className="border border-white/10 bg-[#0a0a0a]" data-testid={`artifact-query-${art.language}`}>
       <div className="px-4 py-2 border-b border-white/10 flex items-center gap-2">
-        <Terminal className="w-3.5 h-3.5" style={{ color: isSpl ? SPLUNK : BQ }} />
-        <span className="font-mono text-[11px] tracking-widest uppercase" style={{ color: isSpl ? SPLUNK : BQ }}>
+        <Terminal className="w-3.5 h-3.5" style={{ color }} />
+        <span className="font-mono text-[11px] tracking-widest uppercase" style={{ color }}>
           {art.title}
         </span>
       </div>
@@ -123,7 +126,7 @@ function PdfButton({ messageId }) {
 
 export default function MessageView({ msg }) {
   const isUser = msg.role === "user";
-  const accentColor = msg.sources?.includes("splunk") ? SPLUNK : BQ;
+  const accentColor = msg.sources?.includes("local_logs") ? LOCAL_LOGS : msg.sources?.includes("splunk") ? SPLUNK : BQ;
   const isStreaming = !!msg._streaming;
   const isPersisted = msg.message_id && !msg.message_id.startsWith("tmp_");
 
@@ -138,8 +141,8 @@ export default function MessageView({ msg }) {
               <div className="flex gap-1.5 mt-2 flex-wrap">
                 {msg.sources.map((s) => (
                   <span key={s} className="font-mono text-[10px] uppercase tracking-wider px-1.5 py-0.5 border"
-                        style={{ borderColor: s === "splunk" ? SPLUNK : BQ, color: s === "splunk" ? SPLUNK : BQ }}>
-                    {s}
+                        style={{ borderColor: s === "local_logs" ? LOCAL_LOGS : s === "splunk" ? SPLUNK : BQ, color: s === "local_logs" ? LOCAL_LOGS : s === "splunk" ? SPLUNK : BQ }}>
+                      {s === "local_logs" ? "LOCAL CSV" : s}
                   </span>
                 ))}
               </div>

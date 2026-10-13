@@ -5,7 +5,7 @@ import random
 from datetime import datetime, timezone, timedelta
 from html import escape
 from typing import Optional
-from data_sources import fetch_splunk_data, fetch_bigquery_data
+from data_sources import fetch_local_logs_data
 from llm_service import analyze
 from email_service import send_email
 
@@ -153,7 +153,7 @@ async def generate_and_send_digest(user: dict) -> Optional[str]:
     """Query sources for last-week retail KPIs, synthesize report, email it."""
     question = "Summarize last week's checkout rate, cart abandonment, and revenue anomalies across markets."
     random.seed()
-    sources = [await fetch_splunk_data(question), await fetch_bigquery_data(question)]
+    sources = [await fetch_local_logs_data(question)]
     markdown = await analyze(question, sources, session_id=f"digest_{user['user_id']}_{datetime.now(timezone.utc).strftime('%Y%W')}")
     kpis = _detect_anomalies(sources)
     html = _build_email_html(user.get("name") or user["email"], markdown, kpis, FRONTEND_URL)
