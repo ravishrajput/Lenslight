@@ -94,7 +94,10 @@ def _build_bigquery_sql(question: str, table_name: Optional[str] = None) -> str:
 def _build_splunk_query(question: str) -> str:
     q = _question_lower(question)
     filters = []
-    if "checkout" in q or "cart" in q or "conversion" in q:
+    address_question = any(k in q for k in ("address", "postal", "postcode", "zip code"))
+    if address_question:
+        filters.append("event IN (address_added, address_validation_failed)")
+    elif "checkout" in q or "cart" in q or "conversion" in q:
         filters.append("event IN (checkout_started, order_placed, add_to_cart)")
     if "error" in q or "exception" in q or "fail" in q:
         filters.append("level IN (ERROR, FATAL)")
@@ -102,7 +105,8 @@ def _build_splunk_query(question: str) -> str:
         filters.append("response_time>0")
     if not filters:
         filters.append("*")
-    return "search " + " ".join(filters) + " | stats count by source, market"
+    breakdown = "event, source, market" if address_question else "source, market"
+    return "search " + " ".join(filters) + f" | stats count by {breakdown}"
 
 
 async def _fetch_splunk_real(question: str) -> Optional[dict[str, Any]]:

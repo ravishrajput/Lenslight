@@ -27,6 +27,14 @@ def test_bigquery_sql_uses_checkout_events_for_funnel_questions(monkeypatch):
     assert "session_id" in sql
 
 
+def test_splunk_address_question_includes_validation_outcomes():
+    from data_sources import _build_splunk_query
+
+    query = _build_splunk_query("Why is the shipping address not getting added?")
+    assert "event IN (address_added, address_validation_failed)" in query
+    assert "stats count by event, source, market" in query
+
+
 def test_splunk_requires_real_config():
     with pytest.raises(RuntimeError, match="real Splunk"):
         asyncio.run(fetch_splunk_data("Why did checkout rate drop yesterday in the US?"))

@@ -153,7 +153,7 @@ function SourceChip({ id, active, onToggle }) {
 
 function Composer({ onSend, busy }) {
   const [text, setText] = useState("");
-  const [sources, setSources] = useState(["splunk", "bigquery"]);
+  const [sources, setSources] = useState(["bigquery"]);
 
   const toggle = (s) => setSources((cur) => (cur.includes(s) ? cur.filter((x) => x !== s) : [...cur, s]));
 

@@ -163,7 +163,7 @@ class ChatRenameIn(BaseModel):
 
 class SendMessageIn(BaseModel):
     content: str
-    sources: list[str] = Field(default_factory=lambda: ["splunk", "bigquery"])
+    sources: list[str] = Field(default_factory=lambda: ["bigquery"])
 
 
 class DigestSubscribeIn(BaseModel):
