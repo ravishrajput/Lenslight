@@ -5,6 +5,7 @@ import pytest
 from data_sources import (
     _bigquery_table_ref,
     _build_bigquery_sql,
+    fetch_sources_for_question,
     fetch_local_logs_data,
     fetch_bigquery_data,
     fetch_splunk_data,
@@ -52,6 +53,20 @@ def test_local_csv_address_analysis_includes_outcomes_and_error_examples(tmp_pat
     assert {row["event"] for row in result["funnel"]} == {"address_added", "address_validation_failed"}
     assert result["total_errors"] == 1
     assert result["log_examples"][0]["error_code"] == "ADDRESS_POSTAL_MISMATCH"
+
+
+def test_legacy_source_ids_use_local_csv(tmp_path, monkeypatch):
+    csv_path = tmp_path / "events.csv"
+    csv_path.write_text(
+        "timestamp,event,level,response_time,source,market,session_id,order_id,order_value,error_code,error_message\n"
+        "2026-10-12T10:00:00Z,address_added,INFO,120,checkout-api,US,s-1,,,,\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("LOCAL_LOGS_CSV", str(csv_path))
+
+    result = asyncio.run(fetch_sources_for_question("Analyze address activity", ["splunk", "bigquery"]))
+
+    assert [source["source"] for source in result] == ["local_logs"]
 
 
 def test_splunk_requires_real_config():

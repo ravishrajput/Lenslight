@@ -352,11 +352,5 @@ async def fetch_bigquery_data(question: str) -> dict[str, Any]:
 
 
 async def fetch_sources_for_question(question: str, selected_sources: list[str]) -> list[dict[str, Any]]:
-    result = []
-    if "local_logs" in selected_sources:
-        result.append(await fetch_local_logs_data(question))
-    if "splunk" in selected_sources:
-        result.append(await fetch_splunk_data(question))
-    if "bigquery" in selected_sources:
-        result.append(await fetch_bigquery_data(question))
-    return result
+    # Older deployed frontends may still send "splunk" or "bigquery" source IDs.
+    return [await fetch_local_logs_data(question)]

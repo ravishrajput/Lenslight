@@ -61,6 +61,8 @@ The UI should open on http://localhost:3000 and the API will be on http://localh
 
 Deploy the FastAPI backend as a Docker web service and the React frontend as a static site. Render connects to GitHub and deploys on pushes, so no cloud CLI or custom GitHub Actions workflow is needed. MongoDB remains external; use MongoDB Atlas.
 
+Chat analysis and weekly digests use the bundled local dataset at `backend/data/splunk_events.csv`; they do not require Splunk or BigQuery credentials. To replace the dataset, update that CSV and redeploy the backend. `backend/scripts/generate_splunk_sample.py` regenerates the six-month sample both there and in `samples/splunk_events.csv`.
+
 ### 1) Deploy the backend
 
 In Render, create a **New Web Service** and connect this repository. Configure:
@@ -106,7 +108,7 @@ After setup, Render automatically redeploys each service when its configured bra
 ## Production notes
 
 - Keep `.env` files and credentials out of version control; use GitHub secrets for deployment values.
-- The current Splunk and BigQuery connectors use mock data unless configured for live access.
+- The default analysis source is the bundled static CSV; live cloud connectors are not used by chat or digests.
 - Keep each service's environment variables configured in Render; the frontend API URL is a build-time value.
 
 ## Current status

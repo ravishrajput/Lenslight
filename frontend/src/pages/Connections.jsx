@@ -25,7 +25,7 @@ export default function Connections() {
         <div className="font-mono text-[11px] tracking-[0.3em] text-neutral-500 mb-3">// DATA SOURCES</div>
         <h1 className="font-display text-4xl lg:text-5xl font-black mb-4">Where your reports come from.</h1>
         <p className="text-neutral-400 max-w-xl mb-10">
-          These are the systems Lenslight can query. Currently populated with simulated results for safe demos — swap in real credentials when you're ready.
+          Analyses use the bundled six-month local CSV dataset. No Splunk or BigQuery connection is required.
         </p>
         <div className="grid md:grid-cols-2 lg:grid-cols-2 gap-6 stagger">
           {conns.map((c) => (
