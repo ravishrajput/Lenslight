@@ -165,7 +165,7 @@ class ChatRenameIn(BaseModel):
 
 class SendMessageIn(BaseModel):
     content: str
-    sources: list[str] = Field(default_factory=lambda: ["local_logs"])
+    sources: list[str] = Field(default_factory=lambda: ["local_logs", "bigquery"])
 
 
 class DigestSubscribeIn(BaseModel):

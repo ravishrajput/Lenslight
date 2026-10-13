@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 
 const LOCAL_LOGS = "#00E676";
+const BIGQUERY = "#007AFF";
 
 function Sidebar({ chats, currentId, onNew, onDelete, onRename, onOpenDigest }) {
   const { user, logout } = useAuth();
@@ -135,25 +136,34 @@ function Sidebar({ chats, currentId, onNew, onDelete, onRename, onOpenDigest }) 
   );
 }
 
-function SourceChip() {
+function SourceChip({ id, active, onToggle }) {
+  const isLocal = id === "local_logs";
+  const color = isLocal ? LOCAL_LOGS : BIGQUERY;
   return (
-    <span
-      data-testid="source-chip-local_logs"
-      className="font-mono text-[10px] uppercase tracking-widest px-2.5 py-1 border"
-      style={{ borderColor: LOCAL_LOGS, color: LOCAL_LOGS }}
+    <button
+      type="button"
+      onClick={() => onToggle(id)}
+      data-testid={`source-chip-${id}`}
+      className={`font-mono text-[10px] uppercase tracking-widest px-2.5 py-1 border ${active ? "" : "opacity-40"}`}
+      style={{ borderColor: color, color: active ? color : "#737373", transitionProperty: "opacity" }}
     >
-      LOCAL CSV
-    </span>
+      {isLocal ? "LOCAL CSV" : "BIGQUERY"}
+    </button>
   );
 }
 
 function Composer({ onSend, busy }) {
   const [text, setText] = useState("");
+  const [sources, setSources] = useState(["local_logs", "bigquery"]);
+
+  const toggle = (source) => setSources((current) => (
+    current.includes(source) ? current.filter((item) => item !== source) : [...current, source]
+  ));
 
   const submit = (e) => {
     e.preventDefault();
-    if (!text.trim() || busy) return;
-    onSend(text.trim(), ["local_logs"]);
+    if (!text.trim() || busy || sources.length === 0) return;
+    onSend(text.trim(), sources);
     setText("");
   };
 
@@ -166,7 +176,8 @@ function Composer({ onSend, busy }) {
       <div className="max-w-3xl mx-auto">
         <div className="flex items-center gap-2 mb-2">
           <span className="font-mono text-[10px] text-neutral-500 tracking-widest">SOURCES</span>
-          <SourceChip />
+          <SourceChip id="local_logs" active={sources.includes("local_logs")} onToggle={toggle} />
+          <SourceChip id="bigquery" active={sources.includes("bigquery")} onToggle={toggle} />
         </div>
         <div className="flex items-end gap-2 border border-white/15 bg-[#0f0f0f] focus-within:border-white/40" style={{ transitionProperty: "border-color" }}>
           <textarea
@@ -180,7 +191,7 @@ function Composer({ onSend, busy }) {
           />
           <button
             type="submit"
-            disabled={busy || !text.trim()}
+            disabled={busy || !text.trim() || sources.length === 0}
             data-testid="chat-send-btn"
             className="m-2 bg-white text-black px-3 py-2 disabled:opacity-40 hover:bg-neutral-200"
             style={{ transitionProperty: "background-color" }}
@@ -371,7 +382,7 @@ export default function Chat() {
       <main className="flex-1 flex flex-col h-screen">
         <div ref={scrollRef} className="flex-1 overflow-y-auto" data-testid="chat-transcript">
           {messages.length === 0 && !busy ? (
-            <EmptyState onPick={(text) => onSend(text, ["local_logs"])} />
+            <EmptyState onPick={(text) => onSend(text, ["local_logs", "bigquery"])} />
           ) : (
             <div className="max-w-3xl mx-auto px-6 py-4">
               {messages.map((m) => <MessageView key={m.message_id} msg={m} />)}

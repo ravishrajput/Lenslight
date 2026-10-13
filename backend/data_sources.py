@@ -333,7 +333,7 @@ async def _fetch_bigquery_real(question: str) -> Optional[dict[str, Any]]:
             "total_revenue_usd": sum(float(r.get("revenue_usd", 0)) for r in results if r.get("revenue_usd") is not None),
         }
     except Exception as exc:
-        log.warning("BigQuery real source failed; falling back to mock data: %s", exc)
+        log.warning("BigQuery query failed: %s", exc)
         return None
 
 
@@ -352,5 +352,23 @@ async def fetch_bigquery_data(question: str) -> dict[str, Any]:
 
 
 async def fetch_sources_for_question(question: str, selected_sources: list[str]) -> list[dict[str, Any]]:
-    # Older deployed frontends may still send "splunk" or "bigquery" source IDs.
-    return [await fetch_local_logs_data(question)]
+    selected = selected_sources or ["local_logs", "bigquery"]
+    result = []
+
+    # Treat the old Splunk source ID as local CSV for clients with a cached frontend.
+    if "local_logs" in selected or "splunk" in selected:
+        result.append(await fetch_local_logs_data(question))
+
+    if "bigquery" in selected:
+        try:
+            result.append(await fetch_bigquery_data(question))
+        except Exception as exc:
+            log.warning("BigQuery unavailable; continuing with other selected sources: %s", exc)
+            result.append({
+                "source": "bigquery",
+                "status": "unavailable",
+                "error": str(exc),
+                "time_series": [],
+            })
+
+    return result
