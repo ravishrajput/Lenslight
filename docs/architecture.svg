@@ -1,0 +1,142 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" role="img" aria-labelledby="title desc">
+  <title id="title">Lenslight data and LLM architecture</title>
+  <desc id="desc">The backend queries BigQuery as the primary enterprise warehouse and can also use the bundled local CSV, prepares metrics and chart artifacts, sends the question and fetched results to Gemini or Anthropic for interpretation, and returns both results and narrative to the React app.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#090c12"/><stop offset="1" stop-color="#111827"/></linearGradient>
+    <linearGradient id="glow" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#35d6a0"/><stop offset="1" stop-color="#42a5ff"/></linearGradient>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 10 5 0 10Z" fill="#93a4ba"/></marker>
+    <marker id="arrowGreen" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 10 5 0 10Z" fill="#35d6a0"/></marker>
+    <marker id="arrowBlue" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 10 5 0 10Z" fill="#5caeff"/></marker>
+    <style>
+      .title{font:700 34px Inter,ui-sans-serif,system-ui;fill:#f4f7fb}.subtitle{font:15px Inter,ui-sans-serif,system-ui;fill:#9cabbf}
+      .heading{font:700 11px Inter,ui-sans-serif,system-ui;letter-spacing:1.8px;fill:#8291a7}.boxTitle{font:700 18px Inter,ui-sans-serif,system-ui;fill:#edf3fa}
+      .body{font:14px Inter,ui-sans-serif,system-ui;fill:#aab7c8}.small{font:12px Inter,ui-sans-serif,system-ui;fill:#9cabbf}
+      .flow{font:700 11px Inter,ui-sans-serif,system-ui;letter-spacing:.5px;fill:#d7e1ee}.tag{font:700 10px Inter,ui-sans-serif,system-ui;letter-spacing:1px}
+      .line{fill:none;stroke:#93a4ba;stroke-width:2.2;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1600" height="1000" rx="24" fill="url(#bg)"/>
+  <rect width="1600" height="5" rx="2" fill="url(#glow)"/>
+  <text x="56" y="66" class="title">Lenslight · How data becomes an analysis</text>
+  <text x="56" y="98" class="subtitle">The backend calculates and organizes source results; the LLM interprets those results and writes the narrative.</text>
+
+  <text x="55" y="166" class="heading">1 · USER EXPERIENCE</text>
+  <text x="350" y="166" class="heading">2 · API ORCHESTRATION</text>
+  <text x="655" y="166" class="heading">3 · SOURCE DATA</text>
+  <text x="960" y="166" class="heading">4 · PREPARE RESULTS</text>
+  <text x="1265" y="166" class="heading">5 · LLM INTERPRETATION</text>
+
+  <!-- Main processing nodes -->
+  <rect x="55" y="300" width="240" height="290" rx="18" fill="#111b27" stroke="#2d4355" stroke-width="1.5"/>
+  <rect x="55" y="300" width="4" height="290" rx="2" fill="#35d6a0"/>
+  <text x="80" y="341" class="boxTitle">React app</text>
+  <text x="80" y="373" class="body">Chat · Dashboard</text>
+  <text x="80" y="398" class="body">Connections · Digests</text>
+  <line x1="80" y1="420" x2="270" y2="420" stroke="#273747"/>
+  <text x="80" y="450" class="small">Sends question and selected</text>
+  <text x="80" y="470" class="small">sources to the API</text>
+  <rect x="80" y="508" width="190" height="42" rx="9" fill="#153b37"/>
+  <text x="95" y="534" class="tag" fill="#67e5b8">HTTP · SSE STREAM</text>
+
+  <rect x="350" y="300" width="240" height="290" rx="18" fill="#111b27" stroke="#2d4355" stroke-width="1.5"/>
+  <rect x="350" y="300" width="4" height="290" rx="2" fill="#42a5ff"/>
+  <text x="375" y="341" class="boxTitle">FastAPI backend</text>
+  <text x="375" y="373" class="body">Authenticates the user</text>
+  <text x="375" y="398" class="body">Retrieves selected data</text>
+  <text x="375" y="423" class="body">Coordinates chat/dashboard</text>
+  <line x1="375" y1="445" x2="565" y2="445" stroke="#273747"/>
+  <text x="375" y="475" class="small">Saves chats and reports</text>
+  <text x="375" y="498" class="small">Returns results to frontend</text>
+  <text x="375" y="550" class="small">Credentials stay server-side</text>
+
+  <!-- Source data group -->
+  <rect x="655" y="270" width="250" height="150" rx="16" fill="#111b27" stroke="#2d4355" stroke-width="1.5"/>
+  <circle cx="680" cy="303" r="6" fill="#35d6a0"/>
+  <text x="698" y="309" class="boxTitle">Local event CSV</text>
+  <text x="680" y="345" class="body">Bundled checkout, error,</text>
+  <text x="680" y="369" class="body">and latency events</text>
+  <text x="680" y="399" class="small">Available without cloud setup</text>
+
+  <rect x="655" y="450" width="250" height="150" rx="16" fill="#111b27" stroke="#2d4355" stroke-width="1.5"/>
+  <circle cx="680" cy="483" r="6" fill="#5caeff"/>
+  <text x="698" y="489" class="boxTitle">BigQuery</text>
+  <text x="680" y="525" class="body">Primary warehouse source</text>
+  <text x="680" y="549" class="body">Orders and checkout metrics</text>
+  <text x="680" y="579" class="small">Configured with backend credentials</text>
+
+  <!-- Processing results -->
+  <rect x="960" y="300" width="250" height="290" rx="18" fill="#111b27" stroke="#2d4355" stroke-width="1.5"/>
+  <rect x="960" y="300" width="4" height="290" rx="2" fill="#f0b85a"/>
+  <text x="985" y="341" class="boxTitle">Backend data layer</text>
+  <text x="985" y="377" class="body">Queries and aggregates</text>
+  <text x="985" y="402" class="body">source data</text>
+  <text x="985" y="442" class="body">Calculates dashboard</text>
+  <text x="985" y="467" class="body">metrics and comparisons</text>
+  <text x="985" y="507" class="body">Builds chart, table,</text>
+  <text x="985" y="532" class="body">and query artifacts</text>
+  <rect x="985" y="550" width="205" height="24" rx="12" fill="#3a2b16"/>
+  <text x="1000" y="567" class="tag" fill="#f5c66f">MEASUREMENTS + ARTIFACTS</text>
+
+  <!-- LLM -->
+  <rect x="1265" y="300" width="280" height="290" rx="18" fill="#111b27" stroke="#454276" stroke-width="1.5"/>
+  <rect x="1265" y="300" width="4" height="290" rx="2" fill="#a18cff"/>
+  <text x="1290" y="341" class="boxTitle">Gemini / Anthropic</text>
+  <text x="1290" y="377" class="body">Receives the question and</text>
+  <text x="1290" y="402" class="body">fetched source results</text>
+  <line x1="1290" y1="424" x2="1520" y2="424" stroke="#34324f"/>
+  <text x="1290" y="455" class="body">Interprets the evidence</text>
+  <text x="1290" y="480" class="body">and writes a narrative</text>
+  <rect x="1290" y="510" width="230" height="46" rx="10" fill="#282342"/>
+  <text x="1307" y="530" class="small">Gemini when configured;</text>
+  <text x="1307" y="547" class="small">Anthropic only if Gemini is unset</text>
+  <text x="1290" y="576" class="small">Does not calculate chart metrics</text>
+
+  <!-- Input and retrieval arrows -->
+  <path d="M295 445 H342" class="line"/>
+  <rect x="294" y="405" width="78" height="25" rx="8" fill="#172536"/><text x="304" y="422" class="flow">Question</text>
+  <path d="M590 400 H647" class="line"/>
+  <rect x="587" y="358" width="83" height="25" rx="8" fill="#172536"/><text x="597" y="375" class="flow">Fetch data</text>
+
+  <!-- CSV and BigQuery results converge on backend data layer -->
+  <path d="M905 345 H952" class="line"/>
+  <path d="M905 525 H930 V470 H952" class="line"/>
+  <rect x="892" y="300" width="89" height="25" rx="8" fill="#172536"/><text x="900" y="317" class="flow">CSV results</text>
+  <rect x="900" y="488" width="105" height="25" rx="8" fill="#172536"/><text x="908" y="505" class="flow">BQ results</text>
+
+  <!-- Results context to LLM -->
+  <path d="M1210 445 H1257" fill="none" stroke="#a18cff" stroke-width="2.5" marker-end="url(#arrowBlue)"/>
+  <rect x="1192" y="402" width="113" height="27" rx="8" fill="#282342"/><text x="1200" y="420" class="flow">Question + data</text>
+
+  <!-- Outputs: narrative and computed data both return to app -->
+  <path d="M1405 300 V210 H175 V292" fill="none" stroke="#a18cff" stroke-width="2.5" marker-end="url(#arrowBlue)"/>
+  <rect x="668" y="190" width="270" height="29" rx="9" fill="#282342"/><text x="687" y="210" class="flow">LLM narrative summary → app</text>
+  <path d="M1085 590 V670 H175 V598" fill="none" stroke="#f0b85a" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <rect x="467" y="650" width="337" height="29" rx="9" fill="#3a2b16"/><text x="483" y="670" class="flow">Calculated metrics + chart/table artifacts → app</text>
+
+  <!-- Persistence and supporting integrations -->
+  <path d="M470 590 V728" fill="none" stroke="#93a4ba" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <rect x="350" y="728" width="300" height="112" rx="15" fill="#111b27" stroke="#2d4355" stroke-width="1.5"/>
+  <text x="375" y="762" class="boxTitle">MongoDB persistence</text>
+  <text x="375" y="790" class="body">Users · chats · messages · digest runs</text>
+  <text x="375" y="818" class="small">Sessions and cron idempotency records</text>
+
+  <path d="M1085 590 V728" fill="none" stroke="#93a4ba" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <rect x="760" y="728" width="450" height="112" rx="15" fill="#111b27" stroke="#2d4355" stroke-width="1.5"/>
+  <text x="785" y="762" class="boxTitle">Other backend outputs</text>
+  <text x="785" y="790" class="body">PDF export uses saved narrative + report artifacts</text>
+  <text x="785" y="818" class="small">Weekly digest generates a report and sends email</text>
+
+  <rect x="1265" y="728" width="280" height="112" rx="15" fill="#111b27" stroke="#61738a" stroke-width="1.5" stroke-dasharray="7 5"/>
+  <text x="1290" y="762" class="boxTitle">Email provider</text>
+  <text x="1290" y="790" class="body">Optional digest delivery</text>
+  <text x="1290" y="818" class="small">Triggered by preview or scheduled job</text>
+  <path d="M1210 784 H1257" fill="none" stroke="#93a4ba" stroke-width="1.8" stroke-dasharray="6 5" marker-end="url(#arrow)"/>
+
+  <!-- deployment footer -->
+  <rect x="55" y="886" width="1490" height="66" rx="14" fill="#0d141e" stroke="#273747"/>
+  <text x="80" y="914" class="heading">DEPLOYMENT</text>
+  <text x="80" y="937" class="small">Docker Compose: React frontend + FastAPI + MongoDB</text>
+  <line x1="660" y1="901" x2="660" y2="938" stroke="#273747"/>
+  <text x="690" y="914" class="heading">CONTAINER PLATFORM</text>
+  <text x="690" y="937" class="small">Frontend + API containers + external MongoDB · BigQuery / LLM / email credentials remain backend-only</text>
+</svg>

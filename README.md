@@ -1,15 +1,66 @@
 # Lenslight
 
-Lenslight is an AI analytics app with a React frontend and FastAPI backend. Chat can analyze the bundled local event-log CSV together with BigQuery warehouse results and produce a concise investigation report.
+Lenslight is an AI-driven enterprise commercial intelligence prototype. Its product vision is to bring customer behavior, sales, and omnichannel inventory data together so retail teams can investigate performance and make better operational decisions through conversational AI and dashboards.
 
-## What is already implemented
-- FastAPI backend with auth, chat history, streaming responses, PDF export, and scheduled digest emails
-- Mongo-based persistence for users, chats, messages, and sessions
-- Bundled six-month local event-log dataset with checkout, address, latency, and failure records
-- Optional BigQuery queries for warehouse metrics
-- LLM report generation using Gemini, with Anthropic as an optional fallback
-- Anomaly dashboard analyzing local CSV and BigQuery orders independently over 1-7 days, each against its preceding equal-length period
-- React frontend with login, chat flow, connections page, and digest settings
+The current application is a React frontend backed by a FastAPI API, with BigQuery as its central warehouse integration. The backend queries a configured BigQuery orders table and can analyze the bundled event-log dataset alongside it. The local dataset also makes the prototype usable for demos without a warehouse connection. The deck describes a broader target product; capabilities such as live web/mobile event ingestion, live inventory feeds, forecasting, and dynamic pricing are product direction and are not implemented in this repository yet.
+
+## Current application capabilities
+
+- React interface with login, chat, dashboard, connections, and digest settings.
+- FastAPI endpoints for authentication, chat history, streamed responses, dashboards, PDF exports, and digest preferences and dispatch.
+- MongoDB persistence for users, chats, messages, sessions, digest activity, and scheduled-task idempotency records.
+- Bundled six-month local event-log CSV with checkout, address, latency, and failure data.
+- BigQuery warehouse queries for configured order and checkout metrics. BigQuery is the primary enterprise data integration and is configured on the backend; the Connections page does not set it up interactively. The bundled CSV supports local demos and fallback analysis.
+- Dashboard comparisons for local events and BigQuery orders over 1–7 days against the preceding equal-length period.
+- Gemini narrative generation when configured, with Anthropic used when Gemini is not configured and an Anthropic key is available. Metrics and chart/table artifacts are calculated by the backend and returned separately from the LLM narrative.
+- PDF report generation and optional weekly digest emails using the local event data.
+
+## Architecture
+
+The diagram shows what runs today. Dashed nodes describe the deck's proposed future data feeds and decision-support capabilities, not features currently available in the app.
+
+```mermaid
+flowchart LR
+  user([Retail team]) --> web[React web app<br/>Chat · Dashboard · Connections · Digests]
+  web -->|Credentialed HTTP /api| api[FastAPI API<br/>Auth · Chat · Dashboard · Reports]
+  api -->|Read and aggregate| csv[(Bundled event-log CSV)]
+  api -->|Primary warehouse integration| bq[(BigQuery orders table)]
+  api -->|Users, chats, sessions, digests| mongo[(MongoDB)]
+  api -->|Question and retrieved results| llm[Gemini or Anthropic]
+  llm -->|Narrative text| api
+  api -->|Metrics, artifacts, narrative<br/>SSE for chat streaming| web
+
+  subgraph target[Proposed product direction from the presentation]
+    events[Web and mobile customer activity]
+    inventory[Store, warehouse, and in-transit inventory]
+    enterprise[(Unified BigQuery warehouse)]
+    decisions[Forecasting · Pricing suggestions · Root-cause analysis]
+    events -. planned ingestion .-> enterprise
+    inventory -. planned ingestion .-> enterprise
+    enterprise -. planned source .-> api
+    api -. future decision support .-> decisions
+  end
+```
+
+The Mermaid source is [docs/architecture.mmd](docs/architecture.mmd). The detailed architecture image is shown below and available at [docs/architecture.svg](docs/architecture.svg).
+
+![Lenslight application architecture](docs/architecture.svg)
+
+### Request and data flow
+
+- The frontend sends credentialed requests to the backend `/api` routes. Chat narrative is streamed using Server-Sent Events (SSE).
+- The backend retrieves and aggregates BigQuery warehouse data and bundled local CSV data, then builds chart, table, and query artifacts. The local CSV supports demos and fallback analysis; BigQuery is the primary enterprise source.
+- The configured LLM receives the question and retrieved results to write a narrative. It does not calculate dashboard metrics.
+- MongoDB stores account and application state. BigQuery, LLM, and email credentials stay in backend configuration.
+- Weekly digest work uses the local CSV and an authenticated cron webhook can dispatch digests for subscribed users.
+
+## Product direction in the presentation
+
+The presentation frames Lenslight as an omnichannel retail intelligence system that would unify web and app customer activity with inventory across physical stores, warehouses, distribution centers, and goods in transit. Its proposed decision-support outputs include local demand and stock forecasts, pricing and discount suggestions, and root-cause analysis by store and sales channel. These are intended capabilities, not claims about the current prototype. The current repository has no live customer-event or inventory ingestion pipeline and does not implement forecasting or pricing optimization.
+
+## Runtime shape
+
+The Docker Compose setup runs the React frontend, FastAPI backend, and MongoDB as separate services. For production, the frontend and backend can be deployed as containers on any container platform, with MongoDB hosted externally (for example, MongoDB Atlas). BigQuery, LLM keys, email credentials, and cron secrets belong in the backend's server-side environment or secret store; do not expose them in the frontend.
 
 ## Required services
 Before deployment, you need:
@@ -60,21 +111,34 @@ npm start
 
 The UI should open on http://localhost:3000 and the API will be on http://localhost:8000.
 
-## Render deployment
+## Deployment
 
-Deploy the FastAPI backend as a Docker web service and the React frontend as a static site. Render connects to GitHub and deploys on pushes, so no cloud CLI or custom GitHub Actions workflow is needed. MongoDB remains external; use MongoDB Atlas.
+The app uses standard Dockerfiles and can run on any platform that supports containers. Deploy the frontend and backend as separate services and use an external MongoDB database for production. The frontend container listens on port `8080`; the backend listens on the platform-provided `PORT` (default `8080`) and exposes its health endpoint at `/api/`.
+
+For local development or a single Docker host, start the complete stack with Docker Compose:
+
+```sh
+docker compose up --build
+```
+
+For a managed container platform, build from the repository root using each component's Dockerfile and directory as its build context:
+
+```sh
+docker build -t lenslight-api ./backend
+docker build --build-arg REACT_APP_BACKEND_URL=https://YOUR_BACKEND_URL -t lenslight-web ./frontend
+```
+
+Push the images to the platform's container registry and deploy them as separate services. Configure the backend environment and secrets on the backend service. Set the frontend's `REACT_APP_BACKEND_URL` at image build time to the backend's public URL (no trailing slash), because React embeds this value in the built static files.
 
 Chat defaults to both the bundled local dataset and BigQuery. The CSV is at `backend/data/splunk_events.csv`; to replace it, update that file and redeploy the backend. `backend/scripts/generate_splunk_sample.py` regenerates the six-month sample in both that location and `samples/splunk_events.csv`. Weekly digests use the local CSV.
 
 ### 1) Deploy the backend
 
-In Render, create a **New Web Service** and connect this repository. Configure:
+Configure the backend container with:
 
-- Runtime: Docker
-- Dockerfile path: `backend/Dockerfile`
-- Docker build context: `backend`
+- Dockerfile: `backend/Dockerfile`
+- Build context: `backend`
 - Health check path: `/api/`
-- Branch: `main`
 
 Add these environment variables in the service settings:
 
@@ -89,7 +153,7 @@ Add these environment variables in the service settings:
 - `BQ_TABLE`: BigQuery orders table name
 - `GOOGLE_APPLICATION_CREDENTIALS`: `/etc/secrets/gcp-service-account.json`
 
-In the backend service's **Environment → Secret Files**, add `gcp-service-account.json` containing a Google service-account key JSON. Do not commit this file or put it in the frontend. Enable the BigQuery API and grant the service account **BigQuery Job User** on the project and **BigQuery Data Viewer** on the dataset. BigQuery is optional; users can turn off its source in chat to analyze the local CSV only.
+Provide Google credentials through the deployment platform's secure identity or secret mechanism. Do not commit credential files or put them in the frontend. Enable the BigQuery API and grant the service identity **BigQuery Job User** on the project and **BigQuery Data Viewer** on the dataset. On Google Cloud, prefer the runtime service identity over a downloaded service-account key. BigQuery is the primary warehouse integration for Lenslight's enterprise workflows; the bundled local CSV remains available for demos and fallback analysis.
 
 ### Append synthetic recent BigQuery orders
 
@@ -112,29 +176,14 @@ Options include `--days 7`, `--orders-per-day 100`, `--seed 20261017`, and `--dr
 
 Optional backend variables: `WEBHOOK_CRON_SECRET`, `DEMO_EMAIL`, `DEMO_PASSWORD`, `EMAIL_API_KEY`, `EMAIL_FROM_NAME`, and `EMAIL_REPLY_TO`.
 
-Deploy the service and copy its public URL, for example `https://lenslight-api.onrender.com`.
+### Configure the frontend and service URLs
 
-### 2) Deploy the frontend
+Build and deploy the frontend container with `REACT_APP_BACKEND_URL` set to the backend's public URL, without a trailing slash. Configure `FRONTEND_URL` on the backend to the frontend's exact origin. These values must match for API requests, CORS, and login cookies. If either URL changes, update the configuration and rebuild/redeploy the frontend as needed.
 
-Create a **New Static Site** from the same repository. Configure:
-
-- Branch: `main`
-- Root directory: `frontend`
-- Build command: `npm ci && npm run build`
-- Publish directory: `build`
-
-Set the build environment variable `REACT_APP_BACKEND_URL` to the backend URL from step 1, with no trailing slash. Add a rewrite rule from `/*` to `/index.html` so client-side routes work. Deploy and copy the static site URL.
-
-### 3) Connect the app URLs
-
-In the backend service, set `FRONTEND_URL` to the exact static site origin, such as `https://lenslight-web.onrender.com`, then save and redeploy. This origin must match exactly for CORS and login cookies. The frontend build embeds the backend URL, so rebuild the static site if that URL changes.
-
-In MongoDB Atlas, allow connections from the backend service's outbound IP addresses. For a temporary connectivity test, a broad Atlas IP allowlist can help isolate the cause, but restrict it again before production and use a dedicated database user with a strong password.
-
-After setup, Render automatically redeploys each service when its configured branch changes. For production use, choose an always-on backend plan; low-cost/free plans can sleep and add cold-start delays.
+In MongoDB Atlas, allow connections from the backend service's outbound addresses and use a dedicated database user with a strong password. For browser login, HTTPS is required in production because the backend sets secure cookies for non-local frontend origins. If the frontend and backend use different registrable domains, confirm the browser permits the cross-site authentication cookie; using frontend and API subdomains under the same custom domain avoids many third-party-cookie restrictions.
 
 ## Production notes
 
-- Keep `.env` files and credentials out of version control; use GitHub secrets for deployment values.
-- Chat can combine local CSV findings with BigQuery results; if BigQuery is unavailable, the report should disclose that and continue with local findings.
-- Keep each service's environment variables configured in Render; the frontend API URL is a build-time value.
+- Keep `.env` files and credentials out of version control; use the deployment platform's secret manager for sensitive values.
+- Chat combines BigQuery warehouse results with local event-log findings. If BigQuery is temporarily unavailable, the report should disclose that and continue with local findings where possible.
+- Keep server credentials on the backend; the frontend API URL is a build-time value.

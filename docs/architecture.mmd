@@ -1,0 +1,20 @@
+flowchart LR
+  user([Retail team]) --> web[React web app<br/>Chat · Dashboard · Connections · Digests]
+  web -->|Credentialed HTTP /api| api[FastAPI API<br/>Auth · Chat · Dashboard · Reports]
+  api -->|Read and aggregate| csv[(Bundled event-log CSV)]
+  api -->|Primary warehouse integration| bq[(BigQuery orders table)]
+  api -->|Users, chats, sessions, digests| mongo[(MongoDB)]
+  api -->|Question and retrieved results| llm[Gemini or Anthropic]
+  llm -->|Narrative text| api
+  api -->|Metrics, artifacts, narrative<br/>SSE for chat streaming| web
+
+  subgraph target[Proposed product direction from the presentation]
+    events[Web and mobile customer activity]
+    inventory[Store, warehouse, and in-transit inventory]
+    enterprise[(Unified BigQuery warehouse)]
+    decisions[Forecasting · Pricing suggestions · Root-cause analysis]
+    events -. planned ingestion .-> enterprise
+    inventory -. planned ingestion .-> enterprise
+    enterprise -. planned source .-> api
+    api -. future decision support .-> decisions
+  end
