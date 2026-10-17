@@ -2,7 +2,12 @@ import asyncio
 from datetime import date
 
 import server
-from data_sources import build_bigquery_anomaly_dashboard, build_local_anomaly_dashboard
+from data_sources import (
+    build_bigquery_anomaly_dashboard,
+    build_bigquery_checkout_error_dashboard,
+    build_bigquery_checkout_trends_dashboard,
+    build_local_anomaly_dashboard,
+)
 
 
 def _row(timestamp, event="browse", level="INFO", response_time="100", order_value=""):
@@ -93,6 +98,44 @@ def test_bigquery_dashboard_does_not_flag_incomplete_comparison_window():
     assert result["anomalies"] == []
 
 
+def test_bigquery_checkout_errors_are_compared_by_market_and_event():
+    rows = [
+        {"date": "2026-10-16", "market": "US", "event_name": "INVALID_PAYMENT", "error_count": 2},
+        {"date": "2026-10-17", "market": "DE", "event_name": "INVALID_DELIVERY_ADDRESS", "error_count": 5},
+    ]
+
+    result = build_bigquery_checkout_error_dashboard(rows, days=1)
+
+    assert result["source"] == "bigquery_checkout_errors"
+    assert result["current_metrics"] == {"checkout_errors": 5}
+    assert result["baseline_metrics"] == {"checkout_errors": 2}
+    assert result["current_by_market"] == [{"market": "DE", "error_count": 5}]
+    assert result["current_by_event"] == [{"event_name": "INVALID_DELIVERY_ADDRESS", "error_count": 5}]
+    assert result["anomalies"][0]["key"] == "checkout_errors"
+
+
+def test_checkout_trend_dashboard_builds_ten_daily_checkout_and_error_rates():
+    rows = [
+        {
+            "date": "2026-10-17",
+            "checkout_starts": 10,
+            "completed_checkouts": 7,
+            "error_sessions": 2,
+            "error_events": 3,
+            "invalid_address_type_sessions": 1,
+            "invalid_delivery_address_sessions": 1,
+            "invalid_payment_sessions": 0,
+        },
+    ]
+
+    result = build_bigquery_checkout_trends_dashboard(rows)
+
+    assert len(result["daily"]) == 10
+    assert result["daily"][-1]["checkout_rate_pct"] == 70
+    assert result["daily"][-1]["error_rate_pct"] == 20
+    assert result["current_metrics"]["error_events"] == 3
+
+
 def test_dashboard_endpoint_analyzes_and_returns_both_sources(monkeypatch):
     async def local_result(_days):
         return {
@@ -121,6 +164,31 @@ def test_dashboard_endpoint_analyzes_and_returns_both_sources(monkeypatch):
             "anomalies": [],
         }
 
+    async def checkout_errors_result(_days):
+        return {
+            "source": "bigquery_checkout_errors",
+            "status": "available",
+            "latest_data_date": "2026-10-17",
+            "period": {"start": "2026-10-17", "end": "2026-10-17"},
+            "baseline_period": {"start": "2026-10-16", "end": "2026-10-16"},
+            "current_metrics": {"checkout_errors": 3},
+            "baseline_metrics": {"checkout_errors": 1},
+            "current_by_event": [{"event_name": "INVALID_PAYMENT", "error_count": 3}],
+            "current_by_market": [{"market": "US", "error_count": 3}],
+            "daily": [],
+            "anomalies": [],
+        }
+
+    async def checkout_trends_result(_days):
+        return {
+            "source": "bigquery_checkout_trends",
+            "status": "available",
+            "latest_data_date": "2026-10-17",
+            "period": {"start": "2026-10-08", "end": "2026-10-17"},
+            "current_metrics": {"checkout_rate_pct": 75, "error_rate_pct": 5},
+            "daily": [],
+        }
+
     analyzed = {}
 
     async def analyze(question, sources, session_id):
@@ -130,15 +198,20 @@ def test_dashboard_endpoint_analyzes_and_returns_both_sources(monkeypatch):
 
     monkeypatch.setattr(server, "fetch_local_anomaly_dashboard", local_result)
     monkeypatch.setattr(server, "fetch_bigquery_anomaly_dashboard", bigquery_result)
+    monkeypatch.setattr(server, "fetch_bigquery_checkout_error_dashboard", checkout_errors_result)
+    monkeypatch.setattr(server, "fetch_bigquery_checkout_trends_dashboard", checkout_trends_result)
     monkeypatch.setattr(server, "analyze", analyze)
 
     result = asyncio.run(
         server.dashboard_anomalies(days=1, user={"user_id": "test-user"})
     )
 
-    assert [source["source"] for source in result["sources"]] == ["local_logs", "bigquery"]
+    assert [source["source"] for source in result["sources"]] == [
+        "local_logs", "bigquery", "bigquery_checkout_errors", "bigquery_checkout_trends",
+    ]
     assert all(source["status"] == "available" for source in result["sources"])
     assert analyzed["sources"] == result["sources"]
+    assert "INVALID_DELIVERY_ADDRESS" in analyzed["question"]
     assert result["summary"] == "Both sources analyzed."
 
 
@@ -164,6 +237,16 @@ def test_dashboard_endpoint_keeps_local_data_when_bigquery_is_unavailable(monkey
 
     monkeypatch.setattr(server, "fetch_local_anomaly_dashboard", local_result)
     monkeypatch.setattr(server, "fetch_bigquery_anomaly_dashboard", bigquery_result)
+    monkeypatch.setattr(
+        server,
+        "fetch_bigquery_checkout_error_dashboard",
+        lambda _days: asyncio.sleep(0, result={"source": "bigquery_checkout_errors", "status": "unavailable", "error": "Credentials missing"}),
+    )
+    monkeypatch.setattr(
+        server,
+        "fetch_bigquery_checkout_trends_dashboard",
+        lambda _days: asyncio.sleep(0, result={"source": "bigquery_checkout_trends", "status": "unavailable", "error": "Credentials missing"}),
+    )
     monkeypatch.setattr(server, "analyze", analyze)
 
     result = asyncio.run(

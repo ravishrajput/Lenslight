@@ -382,6 +382,132 @@ def build_bigquery_anomaly_dashboard(daily_rows: list[dict[str, Any]], days: int
     }
 
 
+def build_bigquery_checkout_error_dashboard(rows: list[dict[str, Any]], days: int) -> dict[str, Any]:
+    dated_counts: dict[date, int] = defaultdict(int)
+    current_events: Counter[str] = Counter()
+    baseline_events: Counter[str] = Counter()
+    current_markets: Counter[str] = Counter()
+    baseline_markets: Counter[str] = Counter()
+    for row in rows:
+        day = date.fromisoformat(str(row["date"])[:10])
+        dated_counts[day] += int(row["error_count"] or 0)
+
+    if not dated_counts:
+        return {
+            "source": "bigquery_checkout_errors",
+            "status": "no_data",
+            "error": "No matching checkout error events were found in BigQuery.",
+        }
+
+    latest_day = max(dated_counts)
+    current_start = latest_day - timedelta(days=days - 1)
+    baseline_end = current_start - timedelta(days=1)
+    baseline_start = baseline_end - timedelta(days=days - 1)
+    current_available = min(dated_counts) <= current_start
+    baseline_available = min(dated_counts) <= baseline_start
+    current_total = sum(count for day, count in dated_counts.items() if current_start <= day <= latest_day)
+    baseline_total = sum(count for day, count in dated_counts.items() if baseline_start <= day <= baseline_end)
+
+    for row in rows:
+        day = date.fromisoformat(str(row["date"])[:10])
+        event_name = str(row["event_name"])
+        market = str(row["market"])
+        count = int(row["error_count"] or 0)
+        if current_start <= day <= latest_day:
+            current_events[event_name] += count
+            current_markets[market] += count
+        elif baseline_start <= day <= baseline_end:
+            baseline_events[event_name] += count
+            baseline_markets[market] += count
+
+    complete_periods = current_available and baseline_available
+    anomalies = _detect_dashboard_anomalies(
+        {"checkout_errors": float(current_total)},
+        {"checkout_errors": float(baseline_total)},
+        (("Checkout errors", "checkout_errors", "increase", 25.0, 1.0, " events", 50.0),),
+        complete_periods,
+    )
+    return {
+        "source": "bigquery_checkout_errors",
+        "status": "available",
+        "latest_data_date": latest_day.isoformat(),
+        "period": {"start": current_start.isoformat(), "end": latest_day.isoformat()},
+        "baseline_period": {"start": baseline_start.isoformat(), "end": baseline_end.isoformat()},
+        "current_available": current_available,
+        "baseline_available": baseline_available,
+        "current_metrics": {"checkout_errors": current_total},
+        "baseline_metrics": {"checkout_errors": baseline_total},
+        "current_by_event": [{"event_name": key, "error_count": value} for key, value in current_events.most_common()],
+        "baseline_by_event": [{"event_name": key, "error_count": value} for key, value in baseline_events.most_common()],
+        "current_by_market": [{"market": key, "error_count": value} for key, value in current_markets.most_common()],
+        "baseline_by_market": [{"market": key, "error_count": value} for key, value in baseline_markets.most_common()],
+        "daily": [
+            {"date": (current_start + timedelta(days=offset)).isoformat(),
+             "checkout_errors": dated_counts.get(current_start + timedelta(days=offset), 0)}
+            for offset in range(days)
+        ],
+        "anomalies": anomalies,
+    }
+
+
+def build_bigquery_checkout_trends_dashboard(rows: list[dict[str, Any]], days: int = 10) -> dict[str, Any]:
+    dated = {date.fromisoformat(str(row["date"])[:10]): row for row in rows}
+    if not dated:
+        return {
+            "source": "bigquery_checkout_trends",
+            "status": "no_data",
+            "error": "No checkout events were found in BigQuery.",
+        }
+
+    latest_day = max(dated)
+    start_day = latest_day - timedelta(days=days - 1)
+    daily = []
+    totals = Counter()
+    for offset in range(days):
+        day = start_day + timedelta(days=offset)
+        row = dated.get(day, {})
+        starts = int(row.get("checkout_starts") or 0)
+        completed = int(row.get("completed_checkouts") or 0)
+        errors = int(row.get("error_sessions") or 0)
+        points = {
+            "date": day.isoformat(),
+            "checkout_starts": starts,
+            "completed_checkouts": completed,
+            "checkout_rate_pct": round(completed / starts * 100, 2) if starts else 0,
+            "error_sessions": errors,
+            "error_events": int(row.get("error_events") or 0),
+            "error_rate_pct": round(errors / starts * 100, 2) if starts else 0,
+        }
+        for event_key in ("invalid_address_type_sessions", "invalid_delivery_address_sessions", "invalid_payment_sessions"):
+            points[event_key] = int(row.get(event_key) or 0)
+        daily.append(points)
+        totals["checkout_starts"] += starts
+        totals["completed_checkouts"] += completed
+        totals["error_sessions"] += errors
+        totals["error_events"] += points["error_events"]
+
+    starts = totals["checkout_starts"]
+    return {
+        "source": "bigquery_checkout_trends",
+        "status": "available",
+        "latest_data_date": latest_day.isoformat(),
+        "period": {"start": start_day.isoformat(), "end": latest_day.isoformat()},
+        "current_metrics": {
+            "checkout_starts": starts,
+            "completed_checkouts": totals["completed_checkouts"],
+            "checkout_rate_pct": round(totals["completed_checkouts"] / starts * 100, 2) if starts else 0,
+            "error_sessions": totals["error_sessions"],
+            "error_events": totals["error_events"],
+            "error_rate_pct": round(totals["error_sessions"] / starts * 100, 2) if starts else 0,
+        },
+        "daily": daily,
+        "rate_definitions": {
+            "checkout_rate_pct": "Distinct sessions with order_placed divided by distinct sessions with checkout_start or checkout_started, per day.",
+            "error_rate_pct": "Distinct sessions with one or more tracked checkout errors divided by distinct checkout-start sessions, per day.",
+        },
+    }
+
+
 def _query_bigquery_anomaly_days(days: int) -> dict[str, Any]:
     from google.cloud import bigquery
 
@@ -451,6 +577,104 @@ async def fetch_bigquery_anomaly_dashboard(days: int) -> dict[str, Any]:
     except Exception as exc:
         log.warning("BigQuery dashboard query failed: %s", exc)
         return {"source": "bigquery", "status": "unavailable", "error": str(exc)}
+
+
+def _query_bigquery_checkout_error_dashboard(days: int) -> dict[str, Any]:
+    from google.cloud import bigquery
+
+    project = os.getenv("GCP_PROJECT_ID") or os.getenv("GOOGLE_CLOUD_PROJECT")
+    if not project:
+        raise RuntimeError("BigQuery is not configured: set GCP_PROJECT_ID or GOOGLE_CLOUD_PROJECT.")
+    table_ref = _bigquery_table_ref("checkout_events")
+    if not table_ref:
+        raise RuntimeError("BigQuery is not configured: no checkout events table was selected.")
+
+    client = bigquery.Client(project=project)
+    latest_query = (
+        "SELECT MAX(DATE(event_timestamp)) AS latest_date "
+        f"FROM `{table_ref}` "
+        "WHERE event_name IN ('INVALID_ADDRESS_TYPE', 'INVALID_DELIVERY_ADDRESS', 'INVALID_PAYMENT')"
+    )
+    latest_row = next(iter(client.query(latest_query).result()), None)
+    latest_value = latest_row["latest_date"] if latest_row else None
+    if latest_value is None:
+        return build_bigquery_checkout_error_dashboard([], days)
+
+    latest_day = latest_value if isinstance(latest_value, date) else date.fromisoformat(str(latest_value)[:10])
+    start_date = latest_day - timedelta(days=(days * 2) - 1)
+    daily_query = (
+        "SELECT DATE(event_timestamp) AS date, market, event_name, COUNT(*) AS error_count "
+        f"FROM `{table_ref}` "
+        "WHERE event_name IN ('INVALID_ADDRESS_TYPE', 'INVALID_DELIVERY_ADDRESS', 'INVALID_PAYMENT') "
+        "AND DATE(event_timestamp) BETWEEN @start_date AND @end_date "
+        "GROUP BY date, market, event_name ORDER BY date, market, error_count DESC"
+    )
+    query_config = bigquery.QueryJobConfig(query_parameters=[
+        bigquery.ScalarQueryParameter("start_date", "DATE", start_date),
+        bigquery.ScalarQueryParameter("end_date", "DATE", latest_day),
+    ])
+    rows = [dict(row) for row in client.query(daily_query, job_config=query_config).result()]
+    return build_bigquery_checkout_error_dashboard(rows, days)
+
+
+async def fetch_bigquery_checkout_error_dashboard(days: int) -> dict[str, Any]:
+    try:
+        return await asyncio.to_thread(_query_bigquery_checkout_error_dashboard, days)
+    except Exception as exc:
+        log.warning("BigQuery checkout error dashboard query failed: %s", exc)
+        return {"source": "bigquery_checkout_errors", "status": "unavailable", "error": str(exc)}
+
+
+def _query_bigquery_checkout_trends_dashboard(days: int = 10) -> dict[str, Any]:
+    from google.cloud import bigquery
+
+    project = os.getenv("GCP_PROJECT_ID") or os.getenv("GOOGLE_CLOUD_PROJECT")
+    if not project:
+        raise RuntimeError("BigQuery is not configured: set GCP_PROJECT_ID or GOOGLE_CLOUD_PROJECT.")
+    table_ref = _bigquery_table_ref("checkout_events")
+    if not table_ref:
+        raise RuntimeError("BigQuery is not configured: no checkout events table was selected.")
+
+    client = bigquery.Client(project=project)
+    event_filter = (
+        "event_name IN ('checkout_start', 'checkout_started', 'order_placed', "
+        "'INVALID_ADDRESS_TYPE', 'INVALID_DELIVERY_ADDRESS', 'INVALID_PAYMENT')"
+    )
+    latest_query = f"SELECT MAX(DATE(event_timestamp)) AS latest_date FROM `{table_ref}` WHERE {event_filter}"
+    latest_row = next(iter(client.query(latest_query).result()), None)
+    latest_value = latest_row["latest_date"] if latest_row else None
+    if latest_value is None:
+        return build_bigquery_checkout_trends_dashboard([], days)
+
+    latest_day = latest_value if isinstance(latest_value, date) else date.fromisoformat(str(latest_value)[:10])
+    start_day = latest_day - timedelta(days=days - 1)
+    daily_query = (
+        "SELECT DATE(event_timestamp) AS date, "
+        "COUNT(DISTINCT IF(event_name IN ('checkout_start', 'checkout_started'), session_id, NULL)) AS checkout_starts, "
+        "COUNT(DISTINCT IF(event_name = 'order_placed', session_id, NULL)) AS completed_checkouts, "
+        "COUNT(DISTINCT IF(event_name IN ('INVALID_ADDRESS_TYPE', 'INVALID_DELIVERY_ADDRESS', 'INVALID_PAYMENT'), session_id, NULL)) AS error_sessions, "
+        "COUNTIF(event_name IN ('INVALID_ADDRESS_TYPE', 'INVALID_DELIVERY_ADDRESS', 'INVALID_PAYMENT')) AS error_events, "
+        "COUNT(DISTINCT IF(event_name = 'INVALID_ADDRESS_TYPE', session_id, NULL)) AS invalid_address_type_sessions, "
+        "COUNT(DISTINCT IF(event_name = 'INVALID_DELIVERY_ADDRESS', session_id, NULL)) AS invalid_delivery_address_sessions, "
+        "COUNT(DISTINCT IF(event_name = 'INVALID_PAYMENT', session_id, NULL)) AS invalid_payment_sessions "
+        f"FROM `{table_ref}` WHERE {event_filter} "
+        "AND DATE(event_timestamp) BETWEEN @start_date AND @end_date "
+        "GROUP BY date ORDER BY date"
+    )
+    query_config = bigquery.QueryJobConfig(query_parameters=[
+        bigquery.ScalarQueryParameter("start_date", "DATE", start_day),
+        bigquery.ScalarQueryParameter("end_date", "DATE", latest_day),
+    ])
+    rows = [dict(row) for row in client.query(daily_query, job_config=query_config).result()]
+    return build_bigquery_checkout_trends_dashboard(rows, days)
+
+
+async def fetch_bigquery_checkout_trends_dashboard(days: int = 10) -> dict[str, Any]:
+    try:
+        return await asyncio.to_thread(_query_bigquery_checkout_trends_dashboard, days)
+    except Exception as exc:
+        log.warning("BigQuery checkout trends dashboard query failed: %s", exc)
+        return {"source": "bigquery_checkout_trends", "status": "unavailable", "error": str(exc)}
 
 
 def _has_real_splunk() -> bool:

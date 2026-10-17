@@ -2,6 +2,16 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import { ArrowLeft, AlertTriangle, BarChart3, RefreshCw } from "lucide-react";
+import {
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { http } from "@/lib/api";
 
 const metricLabels = {
@@ -11,6 +21,8 @@ const metricLabels = {
   avg_response_time_ms: "AVG RESPONSE",
   checkout_completion_pct: "CHECKOUT COMPLETION",
   avg_order_value_usd: "AVG ORDER VALUE",
+  checkout_errors: "CHECKOUT ERRORS",
+  checkout_rate_pct: "CHECKOUT RATE",
 };
 
 const metricOrder = [
@@ -20,6 +32,8 @@ const metricOrder = [
   "avg_response_time_ms",
   "checkout_completion_pct",
   "avg_order_value_usd",
+  "checkout_errors",
+  "checkout_rate_pct",
 ];
 
 function displayDate(value) {
@@ -34,13 +48,93 @@ function metricValue(key, value) {
   if (key === "revenue_usd" || key === "avg_order_value_usd") {
     return `$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
   }
-  if (key.endsWith("_pct")) return `${value.toFixed(1)}%`;
+  if (key.endsWith("_pct")) return `${Number(value).toFixed(1)}%`;
   if (key === "avg_response_time_ms") return `${Math.round(value)} ms`;
   return Math.round(value).toLocaleString();
 }
 
+function CheckoutTrends({ source }) {
+  if (!source || source.status !== "available") {
+    return (
+      <section className="border border-white/10 bg-[#0a0a0a] p-5 mb-6">
+        <h2 className="font-mono text-[11px] tracking-widest text-neutral-300 mb-3">10-DAY CHECKOUT & ERROR RATES</h2>
+        <p className="text-sm text-neutral-400">{source?.error || "Checkout trend data is unavailable."}</p>
+      </section>
+    );
+  }
+
+  const chartData = source.daily.map((row) => ({
+    ...row,
+    invalid_address_type_rate_pct: row.checkout_starts ? row.invalid_address_type_sessions / row.checkout_starts * 100 : 0,
+    invalid_delivery_address_rate_pct: row.checkout_starts ? row.invalid_delivery_address_sessions / row.checkout_starts * 100 : 0,
+    invalid_payment_rate_pct: row.checkout_starts ? row.invalid_payment_sessions / row.checkout_starts * 100 : 0,
+  }));
+  const axisDate = (value) => new Date(`${value}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const rateTooltip = (value) => `${Number(value).toFixed(1)}%`;
+  const commonChartProps = {
+    data: chartData,
+    margin: { top: 8, right: 12, left: -18, bottom: 0 },
+  };
+
+  return (
+    <section className="border border-white/10 bg-[#0a0a0a] p-5 mb-6">
+      <div className="flex flex-wrap items-end justify-between gap-3 mb-5">
+        <div>
+          <h2 className="font-mono text-[11px] tracking-widest text-neutral-300">10-DAY CHECKOUT & ERROR RATES</h2>
+          <p className="text-xs text-neutral-500 mt-2">{displayDate(source.period.start)} – {displayDate(source.period.end)} · latest available checkout data</p>
+        </div>
+        <div className="flex flex-wrap gap-4 font-mono text-[10px] text-neutral-400">
+          <span>CHECKOUT {source.current_metrics.checkout_rate_pct.toFixed(1)}%</span>
+          <span>ERROR SESSIONS {source.current_metrics.error_rate_pct.toFixed(1)}%</span>
+          <span>{source.current_metrics.error_events.toLocaleString()} ERROR EVENTS</span>
+        </div>
+      </div>
+      <div className="grid lg:grid-cols-2 gap-5">
+        <div className="border border-white/5 p-4">
+          <h3 className="font-mono text-[10px] tracking-widest text-neutral-400 mb-4">CHECKOUT COMPLETION RATE</h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart {...commonChartProps}>
+                <CartesianGrid stroke="#262626" strokeDasharray="3 3" />
+                <XAxis dataKey="date" tickFormatter={axisDate} stroke="#737373" tick={{ fill: "#a3a3a3", fontSize: 10 }} />
+                <YAxis tickFormatter={rateTooltip} stroke="#737373" tick={{ fill: "#a3a3a3", fontSize: 10 }} />
+                <Tooltip labelFormatter={axisDate} formatter={rateTooltip} contentStyle={{ background: "#111", border: "1px solid #333" }} />
+                <Line type="monotone" dataKey="checkout_rate_pct" name="Checkout rate" stroke="#00E676" strokeWidth={2} dot={{ r: 3 }} connectNulls />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <p className="text-[11px] text-neutral-600 mt-2">Completed checkout sessions ÷ checkout-start sessions for each day.</p>
+        </div>
+        <div className="border border-white/5 p-4">
+          <h3 className="font-mono text-[10px] tracking-widest text-neutral-400 mb-4">ERROR SESSION RATE BY TYPE</h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart {...commonChartProps}>
+                <CartesianGrid stroke="#262626" strokeDasharray="3 3" />
+                <XAxis dataKey="date" tickFormatter={axisDate} stroke="#737373" tick={{ fill: "#a3a3a3", fontSize: 10 }} />
+                <YAxis tickFormatter={rateTooltip} stroke="#737373" tick={{ fill: "#a3a3a3", fontSize: 10 }} />
+                <Tooltip labelFormatter={axisDate} formatter={rateTooltip} contentStyle={{ background: "#111", border: "1px solid #333" }} />
+                <Legend wrapperStyle={{ fontSize: 10, color: "#a3a3a3" }} />
+                <Line type="monotone" dataKey="error_rate_pct" name="Any tracked error" stroke="#F24E1E" strokeWidth={2} dot={{ r: 2 }} connectNulls />
+                <Line type="monotone" dataKey="invalid_address_type_rate_pct" name="Invalid address type" stroke="#FF9F0A" dot={{ r: 2 }} connectNulls />
+                <Line type="monotone" dataKey="invalid_delivery_address_rate_pct" name="Invalid delivery address" stroke="#AF52DE" dot={{ r: 2 }} connectNulls />
+                <Line type="monotone" dataKey="invalid_payment_rate_pct" name="Invalid payment" stroke="#64D2FF" dot={{ r: 2 }} connectNulls />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <p className="text-[11px] text-neutral-600 mt-2">Distinct sessions with each error ÷ checkout-start sessions for each day.</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function SourceDashboard({ source }) {
-  const label = source.source === "local_logs" ? "LOCAL CSV" : "BIGQUERY";
+  const label = source.source === "local_logs"
+    ? "LOCAL CSV"
+    : source.source === "bigquery_checkout_errors"
+      ? "BIGQUERY — CHECKOUT ERRORS"
+      : "BIGQUERY — ORDERS";
   const keys = source.current_metrics
     ? metricOrder.filter((key) => key in source.current_metrics)
     : [];
@@ -89,6 +183,25 @@ function SourceDashboard({ source }) {
             ))}
           </div>
 
+          {source.source === "bigquery_checkout_errors" && (
+            <div className="grid md:grid-cols-2 gap-5 mb-6">
+              {[
+                ["ERRORS BY EVENT", source.current_by_event, "event_name"],
+                ["ERRORS BY MARKET", source.current_by_market, "market"],
+              ].map(([title, rows, labelKey]) => (
+                <div key={title} className="border border-white/10 p-4">
+                  <h3 className="font-mono text-[10px] tracking-widest text-neutral-400 mb-3">{title}</h3>
+                  {rows.length ? rows.map((row) => (
+                    <div key={row[labelKey]} className="flex justify-between gap-4 py-2 border-t border-white/5 text-xs">
+                      <span className="text-neutral-300">{row[labelKey]}</span>
+                      <span className="font-mono text-white">{row.error_count.toLocaleString()}</span>
+                    </div>
+                  )) : <p className="text-xs text-neutral-500">No matching events in this period.</p>}
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-mono text-[10px] tracking-widest text-neutral-400">MEASURED ANOMALIES</h3>
             <span className="font-mono text-[10px] text-neutral-500">{source.anomalies.length} DETECTED</span>
@@ -134,9 +247,11 @@ function SourceDashboard({ source }) {
                 <tr>
                   {[
                     "date",
-                    ...(source.source === "local_logs" ? ["events", "errors"] : []),
-                    "orders",
-                    "revenue_usd",
+                    ...(source.source === "local_logs" ? ["events", "errors", "orders", "revenue_usd"] :
+                      source.source === "bigquery_checkout_errors" ? ["checkout_errors"] :
+                        source.source === "bigquery_checkout_trends"
+                          ? ["checkout_starts", "completed_checkouts", "checkout_rate_pct", "error_sessions", "error_events", "error_rate_pct"]
+                          : ["orders", "revenue_usd"]),
                   ].map((key) => (
                     <th key={key} className="px-4 py-3 font-normal tracking-widest">{key.replace("_", " ").toUpperCase()}</th>
                   ))}
@@ -146,14 +261,19 @@ function SourceDashboard({ source }) {
                 {source.daily.map((row) => (
                   <tr key={row.date} className="border-t border-white/5 text-neutral-300">
                     <td className="px-4 py-3">{displayDate(row.date)}</td>
-                    {source.source === "local_logs" && (
-                      <>
-                        <td className="px-4 py-3">{row.events.toLocaleString()}</td>
-                        <td className="px-4 py-3">{row.errors.toLocaleString()}</td>
-                      </>
-                    )}
-                    <td className="px-4 py-3">{row.orders.toLocaleString()}</td>
-                    <td className="px-4 py-3">{metricValue("revenue_usd", row.revenue_usd)}</td>
+                    {(source.source === "local_logs"
+                      ? ["events", "errors", "orders", "revenue_usd"]
+                      : source.source === "bigquery_checkout_errors" ? ["checkout_errors"]
+                        : source.source === "bigquery_checkout_trends"
+                          ? ["checkout_starts", "completed_checkouts", "checkout_rate_pct", "error_sessions", "error_events", "error_rate_pct"]
+                          : ["orders", "revenue_usd"]
+                    ).map((key) => (
+                      <td key={key} className="px-4 py-3">
+                        {key === "revenue_usd" || key.endsWith("_pct")
+                          ? metricValue(key, row[key])
+                          : row[key].toLocaleString()}
+                      </td>
+                    ))}
                   </tr>
                 ))}
               </tbody>
@@ -215,7 +335,7 @@ export default function Dashboard() {
             <div className="font-mono text-[11px] tracking-[0.3em] text-neutral-500 mb-3">// SIGNAL MONITOR</div>
             <h1 className="font-display text-4xl lg:text-5xl font-black">Recent anomalies.</h1>
             <p className="text-sm text-neutral-400 mt-3 max-w-2xl">
-              Each connected source is analyzed independently against its immediately preceding period. Metrics are not joined across sources.
+              The AI compares orders, revenue, and checkout error patterns across recent periods. Error and order records are not joined.
             </p>
           </div>
           <label className="font-mono text-[10px] tracking-widest text-neutral-500">
@@ -252,10 +372,13 @@ export default function Dashboard() {
                 <ReactMarkdown>{data.summary}</ReactMarkdown>
               </div>
             </section>
+            <CheckoutTrends source={data.sources.find((source) => source.source === "bigquery_checkout_trends")} />
             <div className="font-mono text-[10px] tracking-widest text-neutral-500 mb-3">
               SOURCE STATUS — {data.sources.filter((source) => source.status === "available").length} OF {data.sources.length} AVAILABLE
             </div>
-            {data.sources.map((source) => <SourceDashboard key={source.source} source={source} />)}
+            {data.sources
+              .filter((source) => source.source !== "bigquery_checkout_trends")
+              .map((source) => <SourceDashboard key={source.source} source={source} />)}
           </>
         ) : null}
       </main>

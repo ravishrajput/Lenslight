@@ -24,6 +24,8 @@ from pydantic import BaseModel, EmailStr, Field
 from auth_utils import hash_password, verify_password, create_access_token, get_current_user
 from data_sources import (
     fetch_bigquery_anomaly_dashboard,
+    fetch_bigquery_checkout_error_dashboard,
+    fetch_bigquery_checkout_trends_dashboard,
     fetch_local_anomaly_dashboard,
     fetch_sources_for_question,
 )
@@ -246,13 +248,20 @@ def _chat_doc_to_out(doc):
 
 @api.get("/dashboard/anomalies")
 async def dashboard_anomalies(days: int = Query(default=7, ge=1, le=7), user=Depends(current_user)):
-    local_result, bigquery_result = await asyncio.gather(
+    local_result, bigquery_result, checkout_errors_result, checkout_trends_result = await asyncio.gather(
         fetch_local_anomaly_dashboard(days),
         fetch_bigquery_anomaly_dashboard(days),
+        fetch_bigquery_checkout_error_dashboard(days),
+        fetch_bigquery_checkout_trends_dashboard(10),
         return_exceptions=True,
     )
     sources = []
-    for source_name, result in (("local_logs", local_result), ("bigquery", bigquery_result)):
+    for source_name, result in (
+        ("local_logs", local_result),
+        ("bigquery", bigquery_result),
+        ("bigquery_checkout_errors", checkout_errors_result),
+        ("bigquery_checkout_trends", checkout_trends_result),
+    ):
         if isinstance(result, Exception):
             sources.append({
                 "source": source_name,
@@ -270,10 +279,16 @@ async def dashboard_anomalies(days: int = Query(default=7, ge=1, le=7), user=Dep
         return {"days": days, "sources": sources, "summary": summary}
 
     question = (
-        f"Summarize measured anomalies for the latest {days} available days in each source, "
-        "compared with the immediately preceding equal-length period. Analyze sources separately. "
-        "Do not join records or imply the metrics are directly comparable when periods or definitions differ. "
-        "Be concise; do not invent causes. Mention any source that is unavailable."
+        f"Analyze the latest {days} available days in each source against the immediately preceding equal-length period. "
+        "For BigQuery checkout errors, analyze INVALID_ADDRESS_TYPE, INVALID_DELIVERY_ADDRESS, and INVALID_PAYMENT "
+        "counts by market and event, and identify measured changes between periods. "
+        "Also interpret the 10-day daily checkout conversion rate and tracked checkout error-session rate, "
+        "using the provided rate definitions and noting days with no checkout starts. "
+        "Analyze sources separately. "
+        "Use the orders table to describe order and revenue movement. You may discuss whether error and order trends "
+        "move together as a possible relationship, but do not claim causation or join records across tables. "
+        "Do not imply the metrics are directly comparable when periods or definitions differ. Be concise, use only "
+        "the supplied measurements, and mention any source that is unavailable."
     )
     summary = await analyze(
         question,
