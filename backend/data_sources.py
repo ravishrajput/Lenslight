@@ -396,7 +396,13 @@ def _query_bigquery_anomaly_days(days: int) -> dict[str, Any]:
     client = bigquery.Client(project=project)
     table = client.get_table(table_ref)
     field_names = {field.name for field in table.schema}
-    missing_fields = {"transaction_timestamp", "order_value"} - field_names
+    timestamp_field = next(
+        (name for name in ("order_timestamp", "transaction_timestamp") if name in field_names),
+        None,
+    )
+    missing_fields = {"order_value"} - field_names
+    if timestamp_field is None:
+        missing_fields.add("order_timestamp or transaction_timestamp")
     if missing_fields:
         raise RuntimeError(
             f"BigQuery table {table_ref} is missing required dashboard fields: "
@@ -406,16 +412,14 @@ def _query_bigquery_anomaly_days(days: int) -> dict[str, Any]:
     timestamp_type = next(
         field.field_type.upper()
         for field in table.schema
-        if field.name == "transaction_timestamp"
+        if field.name == timestamp_field
     )
     if timestamp_type not in {"TIMESTAMP", "DATETIME", "DATE"}:
-        raise RuntimeError(
-            f"BigQuery field transaction_timestamp must be TIMESTAMP, DATETIME, or DATE, not {timestamp_type}."
-        )
+        raise RuntimeError(f"BigQuery field {timestamp_field} must be TIMESTAMP, DATETIME, or DATE, not {timestamp_type}.")
 
     latest_query = (
-        f"SELECT MAX(DATE(transaction_timestamp)) AS latest_date "
-        f"FROM `{table_ref}` WHERE transaction_timestamp IS NOT NULL"
+        f"SELECT MAX(DATE({timestamp_field})) AS latest_date "
+        f"FROM `{table_ref}` WHERE {timestamp_field} IS NOT NULL"
     )
     latest_row = next(iter(client.query(latest_query).result()), None)
     latest_value = latest_row["latest_date"] if latest_row else None
@@ -425,12 +429,12 @@ def _query_bigquery_anomaly_days(days: int) -> dict[str, Any]:
     latest_day = latest_value if isinstance(latest_value, date) else date.fromisoformat(str(latest_value)[:10])
     baseline_start = latest_day - timedelta(days=(days * 2) - 1)
     daily_query = (
-        "SELECT DATE(transaction_timestamp) AS date, "
+        f"SELECT DATE({timestamp_field}) AS date, "
         "COUNT(*) AS orders, "
         "SUM(CAST(order_value AS FLOAT64)) AS revenue_usd, "
         "AVG(CAST(order_value AS FLOAT64)) AS avg_order_value_usd "
         f"FROM `{table_ref}` "
-        "WHERE DATE(transaction_timestamp) BETWEEN @start_date AND @end_date "
+        f"WHERE DATE({timestamp_field}) BETWEEN @start_date AND @end_date "
         "GROUP BY date ORDER BY date"
     )
     query_config = bigquery.QueryJobConfig(query_parameters=[
@@ -487,9 +491,34 @@ def _bigquery_table_ref(table_name: Optional[str] = None) -> str:
 
 def _build_bigquery_sql(question: str, table_name: Optional[str] = None) -> str:
     q = _question_lower(question)
+    checkout_error_events = (
+        "INVALID_ADDRESS_TYPE",
+        "INVALID_DELIVERY_ADDRESS",
+        "INVALID_PAYMENT",
+    )
+    is_checkout_error_question = any(
+        term in q
+        for term in (
+            "checkout error", "checkout errors", "error event", "error events",
+            "invalid_address_type", "invalid_delivery_address", "invalid_payment",
+        )
+    )
+    checkout_question = is_checkout_error_question or any(
+        k in q for k in ("checkout", "funnel", "conversion", "shipping", "payment_info", "order_placed", "cart")
+    )
     if table_name is None:
-        table_name = "checkout_events" if any(k in q for k in ["checkout", "funnel", "conversion", "shipping", "payment_info", "order_placed", "cart"]) else _bq_table()
+        table_name = "checkout_events" if checkout_question else _bq_table()
     table_ref = f"`{_bigquery_table_ref(table_name)}`"
+
+    if is_checkout_error_question:
+        event_values = ", ".join(f"'{event}'" for event in checkout_error_events)
+        return (
+            "SELECT DATE(event_timestamp) AS date, market, event_name, COUNT(*) AS error_count "
+            f"FROM {table_ref} "
+            f"WHERE event_name IN ({event_values}) "
+            "GROUP BY date, market, event_name "
+            "ORDER BY date, market, error_count DESC"
+        )
 
     if any(k in q for k in ["checkout", "funnel", "conversion", "shipping", "payment_info", "order_placed", "cart"]):
         return (
@@ -531,9 +560,9 @@ def _build_bigquery_sql(question: str, table_name: Optional[str] = None) -> str:
         )
 
     return (
-        "SELECT DATE(transaction_timestamp) AS date, SUM(order_value) AS revenue_usd "
-        f"FROM {table_ref} WHERE transaction_timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 14 DAY) "
-        "GROUP BY DATE(transaction_timestamp) ORDER BY date"
+        "SELECT DATE(order_timestamp) AS date, SUM(order_value) AS revenue_usd "
+        f"FROM {table_ref} WHERE order_timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 14 DAY) "
+        "GROUP BY DATE(order_timestamp) ORDER BY date"
     )
 
 
@@ -602,7 +631,10 @@ async def _fetch_bigquery_real(question: str) -> Optional[dict[str, Any]]:
         return None
 
     q = _question_lower(question)
-    if "checkout" in q or "funnel" in q or "conversion" in q or "shipping" in q or "payment_info" in q or "order_placed" in q:
+    if any(term in q for term in (
+        "checkout", "funnel", "conversion", "shipping", "payment_info", "order_placed",
+        "invalid_address_type", "invalid_delivery_address", "invalid_payment", "checkout error", "checkout errors",
+    )):
         target_table = "checkout_events"
     else:
         target_table = _bq_table()

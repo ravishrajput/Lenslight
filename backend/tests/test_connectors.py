@@ -30,6 +30,30 @@ def test_bigquery_sql_uses_checkout_events_for_funnel_questions(monkeypatch):
     assert "session_id" in sql
 
 
+def test_bigquery_sql_analyzes_checkout_error_events_by_date_and_market(monkeypatch):
+    monkeypatch.setenv("GCP_PROJECT_ID", "lenslight-511415")
+    monkeypatch.setenv("BQ_DATASET", "lenslight")
+    monkeypatch.setenv("BQ_TABLE", "orders")
+    sql = _build_bigquery_sql("Analyze checkout errors by market")
+
+    assert "`lenslight-511415.lenslight.checkout_events`" in sql
+    assert "DATE(event_timestamp) AS date" in sql
+    assert "market, event_name, COUNT(*) AS error_count" in sql
+    assert "INVALID_ADDRESS_TYPE" in sql
+    assert "INVALID_DELIVERY_ADDRESS" in sql
+    assert "INVALID_PAYMENT" in sql
+
+
+def test_bigquery_orders_sql_uses_order_timestamp(monkeypatch):
+    monkeypatch.setenv("GCP_PROJECT_ID", "lenslight-511415")
+    monkeypatch.setenv("BQ_DATASET", "lenslight")
+    monkeypatch.setenv("BQ_TABLE", "orders")
+    sql = _build_bigquery_sql("Show revenue over time")
+
+    assert "order_timestamp" in sql
+    assert "transaction_timestamp" not in sql
+
+
 def test_splunk_address_question_includes_validation_outcomes():
     from data_sources import _build_splunk_query
 
