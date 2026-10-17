@@ -5,6 +5,7 @@ import Login from "@/pages/Login";
 import AuthCallback from "@/pages/AuthCallback";
 import Chat from "@/pages/Chat";
 import Connections from "@/pages/Connections";
+import Dashboard from "@/pages/Dashboard";
 import { Toaster } from "sonner";
 
 function Protected({ children }) {
@@ -32,6 +33,7 @@ function Router() {
       <Route path="/" element={<Protected><Chat /></Protected>} />
       <Route path="/chat/:chatId" element={<Protected><Chat /></Protected>} />
       <Route path="/connections" element={<Protected><Connections /></Protected>} />
+      <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

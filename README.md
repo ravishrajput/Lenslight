@@ -8,6 +8,7 @@ Lenslight is an AI analytics app with a React frontend and FastAPI backend. Chat
 - Bundled six-month local event-log dataset with checkout, address, latency, and failure records
 - Optional BigQuery queries for warehouse metrics
 - LLM report generation using Gemini, with Anthropic as an optional fallback
+- Anomaly dashboard analyzing local CSV and BigQuery orders independently over 1-7 days, each against its preceding equal-length period
 - React frontend with login, chat flow, connections page, and digest settings
 
 ## Required services
@@ -89,6 +90,25 @@ Add these environment variables in the service settings:
 - `GOOGLE_APPLICATION_CREDENTIALS`: `/etc/secrets/gcp-service-account.json`
 
 In the backend service's **Environment → Secret Files**, add `gcp-service-account.json` containing a Google service-account key JSON. Do not commit this file or put it in the frontend. Enable the BigQuery API and grant the service account **BigQuery Job User** on the project and **BigQuery Data Viewer** on the dataset. BigQuery is optional; users can turn off its source in chat to analyze the local CSV only.
+
+### Append synthetic recent BigQuery orders
+
+For demo data only, the backend includes an append-only script that generates synthetic orders for the configured `BQ_TABLE` (default: `orders`). It uses `GCP_PROJECT_ID` or `GOOGLE_CLOUD_PROJECT`, `BQ_DATASET`, and `BQ_TABLE` from `backend/.env`, and authenticates through Application Default Credentials or `GOOGLE_APPLICATION_CREDENTIALS`.
+
+From the repository root, preview the default seven-day batch first:
+
+```sh
+cd backend
+./.venv/bin/python scripts/append_bigquery_sample.py --dry-run
+```
+
+Then append it:
+
+```sh
+./.venv/bin/python scripts/append_bigquery_sample.py
+```
+
+Options include `--days 7`, `--orders-per-day 100`, `--seed 20261017`, and `--dry-run`. Rows use deterministic `lenslight-demo-...` IDs, so rerunning with the same options skips IDs that already exist. The service account needs BigQuery Job User and BigQuery Data Editor permissions on the target project/table. These are synthetic demo records, not production transactions. The dashboard queries this configured BigQuery orders table as well as the local CSV and reports each source separately; it does not join records across sources.
 
 Optional backend variables: `WEBHOOK_CRON_SECRET`, `DEMO_EMAIL`, `DEMO_PASSWORD`, `EMAIL_API_KEY`, `EMAIL_FROM_NAME`, and `EMAIL_REPLY_TO`.
 

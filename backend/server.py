@@ -22,7 +22,11 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, EmailStr, Field
 
 from auth_utils import hash_password, verify_password, create_access_token, get_current_user
-from data_sources import fetch_sources_for_question
+from data_sources import (
+    fetch_bigquery_anomaly_dashboard,
+    fetch_local_anomaly_dashboard,
+    fetch_sources_for_question,
+)
 from llm_service import analyze, stream_analyze
 from pdf_service import build_report_pdf
 from digest_service import generate_and_send_digest
@@ -238,6 +242,45 @@ def _chat_doc_to_out(doc):
         "created_at": doc["created_at"],
         "updated_at": doc.get("updated_at", doc["created_at"]),
     }
+
+
+@api.get("/dashboard/anomalies")
+async def dashboard_anomalies(days: int = Query(default=7, ge=1, le=7), user=Depends(current_user)):
+    local_result, bigquery_result = await asyncio.gather(
+        fetch_local_anomaly_dashboard(days),
+        fetch_bigquery_anomaly_dashboard(days),
+        return_exceptions=True,
+    )
+    sources = []
+    for source_name, result in (("local_logs", local_result), ("bigquery", bigquery_result)):
+        if isinstance(result, Exception):
+            sources.append({
+                "source": source_name,
+                "status": "unavailable",
+                "error": str(result),
+            })
+        elif result.get("status") == "available" or "current_metrics" in result:
+            sources.append({**result, "status": "available"})
+        else:
+            sources.append(result)
+
+    available_sources = [source for source in sources if source["status"] == "available"]
+    if not available_sources:
+        summary = "No source returned data for this dashboard window. Check the source status and configuration below."
+        return {"days": days, "sources": sources, "summary": summary}
+
+    question = (
+        f"Summarize measured anomalies for the latest {days} available days in each source, "
+        "compared with the immediately preceding equal-length period. Analyze sources separately. "
+        "Do not join records or imply the metrics are directly comparable when periods or definitions differ. "
+        "Be concise; do not invent causes. Mention any source that is unavailable."
+    )
+    summary = await analyze(
+        question,
+        sources,
+        session_id=f"dashboard_{user['user_id']}",
+    )
+    return {"days": days, "sources": sources, "summary": summary}
 
 
 @api.get("/chats")

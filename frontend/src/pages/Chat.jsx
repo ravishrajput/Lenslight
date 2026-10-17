@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import MessageView from "@/components/MessageView";
 import DigestSettings from "@/components/DigestSettings";
 import {
-  Plus, Send, Loader2, Trash2, Pencil, LogOut, Database, ChevronRight, Check, X, Mail
+  Plus, Send, Loader2, Trash2, Pencil, LogOut, Database, ChevronRight, Check, X, Mail, BarChart3
 } from "lucide-react";
 
 const LOCAL_LOGS = "#00E676";
@@ -32,6 +32,14 @@ function Sidebar({ chats, currentId, onNew, onDelete, onRename, onOpenDigest }) 
           <span className="flex items-center gap-2"><Plus className="w-4 h-4" /> New analysis</span>
           <span className="font-mono text-[10px] text-neutral-500">⌘N</span>
         </button>
+        <Link
+          to="/dashboard"
+          data-testid="dashboard-link"
+          className="w-full mt-2 flex items-center gap-2 border border-white/10 px-3 py-2.5 text-sm text-neutral-300 hover:border-[#00E676]/60 hover:text-white"
+          style={{ transitionProperty: "border-color, color" }}
+        >
+          <BarChart3 className="w-4 h-4 text-[#00E676]" /> Anomaly dashboard
+        </Link>
       </div>
 
       <div className="flex-1 overflow-y-auto px-2 py-2" data-testid="chat-history-list">
