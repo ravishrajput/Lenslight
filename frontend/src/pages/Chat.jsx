@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import MessageView from "@/components/MessageView";
 import DigestSettings from "@/components/DigestSettings";
 import {
-  Plus, Send, Loader2, Trash2, Pencil, LogOut, Database, ChevronRight, Check, X, Mail, BarChart3
+  Plus, Send, Loader2, Trash2, Pencil, LogOut, ChevronRight, Check, X, Mail, BarChart3
 } from "lucide-react";
 
 const LOCAL_LOGS = "#00E676";
@@ -19,9 +19,9 @@ function Sidebar({ chats, currentId, onNew, onDelete, onRename, onOpenDigest }) 
   return (
     <aside className="w-[280px] shrink-0 border-r border-white/10 bg-[#070707] flex flex-col h-screen">
       <div className="px-5 py-5 border-b border-white/10">
-        <div className="flex items-center gap-2 mb-5">
-          <img src="/logo.jpg" alt="Lenslight" className="w-5 h-5 object-cover" />
-          <span className="font-mono text-[11px] tracking-[0.25em] text-neutral-300">LENSLIGHT</span>
+        <div className="flex items-center gap-3 mb-5">
+          <img src="/logo.jpg" alt="Lenslight" className="w-8 h-8 object-cover" />
+          <span className="font-mono text-sm tracking-[0.25em] text-neutral-200">LENSLIGHT</span>
         </div>
         <button
           onClick={onNew}
@@ -116,17 +116,6 @@ function Sidebar({ chats, currentId, onNew, onDelete, onRename, onOpenDigest }) 
           </span>
           <ChevronRight className="w-3.5 h-3.5 text-neutral-500" />
         </button>
-        <Link
-          to="/connections"
-          data-testid="connections-link"
-          className="flex items-center justify-between px-3 py-2 border border-white/10 hover:border-white/30 mb-3"
-          style={{ transitionProperty: "border-color" }}
-        >
-          <span className="flex items-center gap-2 font-mono text-xs text-neutral-300">
-            <Database className="w-3.5 h-3.5" /> CONNECTIONS
-          </span>
-          <ChevronRight className="w-3.5 h-3.5 text-neutral-500" />
-        </Link>
         <div className="flex items-center gap-3 px-2 py-2">
           <div className="w-7 h-7 bg-neutral-800 border border-white/10 flex items-center justify-center font-mono text-[11px]">
             {(user?.name || user?.email || "?")[0].toUpperCase()}

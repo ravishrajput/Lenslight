@@ -319,14 +319,11 @@ export default function Dashboard() {
             <ArrowLeft className="w-3.5 h-3.5" /> CHAT
           </Link>
           <div className="h-5 w-px bg-white/10" />
-          <div className="flex items-center gap-2">
-            <img src="/logo.jpg" alt="Lenslight" className="w-4 h-4 object-cover" />
-            <div className="font-mono text-[11px] tracking-[0.3em] text-neutral-300">LENSLIGHT / DASHBOARD</div>
+          <div className="flex items-center gap-3">
+            <img src="/logo.jpg" alt="Lenslight" className="w-7 h-7 object-cover" />
+            <div className="font-mono text-sm tracking-[0.25em] text-neutral-200">LENSLIGHT / DASHBOARD</div>
           </div>
         </div>
-        <Link to="/connections" className="font-mono text-[10px] tracking-widest text-neutral-500 hover:text-white">
-          DATA SOURCES
-        </Link>
       </header>
 
       <main className="max-w-6xl mx-auto px-6 py-10">
