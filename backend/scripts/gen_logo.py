@@ -1,7 +1,6 @@
 """One-off logo helper.
 
-This file intentionally avoids any Emergent-specific integrations and uses the
-standard Gemini API configuration already used by the app."""
+This file uses the standard Gemini API configuration already used by the app."""
 import os
 import sys
 from pathlib import Path

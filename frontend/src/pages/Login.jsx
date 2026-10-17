@@ -35,12 +35,6 @@ export default function Login() {
     }
   };
 
-  const googleLogin = () => {
-    // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
-    const redirectUrl = window.location.origin + "/";
-    window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
-  };
-
   return (
     <div className="min-h-screen grid lg:grid-cols-5 bg-[#050505] text-white grain">
       {/* Left: visual */}
@@ -82,17 +76,6 @@ export default function Login() {
 
           <button
             type="button"
-            onClick={googleLogin}
-            data-testid="google-login-btn"
-            className="w-full mb-5 flex items-center justify-center gap-3 border border-white/20 py-3 text-sm hover:border-white/50 hover:bg-white/[0.03]"
-            style={{ transitionProperty: "background-color, border-color" }}
-          >
-            <svg width="16" height="16" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.4H42V20H24v8h11.3C33.9 32.4 29.4 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34 5 29.3 3 24 3 12.3 3 3 12.3 3 24s9.3 21 21 21 21-9.3 21-21c0-1.2-.1-2.3-.4-3.6z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.1 18.9 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34 5 29.3 3 24 3 15.9 3 8.9 7.6 6.3 14.7z"/><path fill="#4CAF50" d="M24 45c5.1 0 9.8-2 13.3-5.1l-6.1-5.2C29.1 36.3 26.7 37 24 37c-5.3 0-9.8-3.5-11.4-8.4l-6.6 5.1C8.4 40.3 15.6 45 24 45z"/><path fill="#1976D2" d="M43.6 20.4H42V20H24v8h11.3c-.8 2.3-2.3 4.2-4.2 5.6l6.1 5.2c-.4.4 6.6-4.8 6.6-14.8 0-1.2-.1-2.3-.4-3.6z"/></svg>
-            <span>Continue with Google</span>
-          </button>
-
-          <button
-            type="button"
             onClick={() => {
               setMode("login");
               setEmail("demo@insightlens.app");
@@ -105,12 +88,6 @@ export default function Login() {
           >
             Use demo credentials →
           </button>
-
-          <div className="flex items-center gap-3 mb-5">
-            <div className="h-px bg-white/10 flex-1" />
-            <span className="font-mono text-[10px] text-neutral-500 tracking-widest">OR WITH EMAIL</span>
-            <div className="h-px bg-white/10 flex-1" />
-          </div>
 
           <form onSubmit={submit} className="space-y-3" data-testid="auth-form">
             {mode === "register" && (

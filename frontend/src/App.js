@@ -1,8 +1,7 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "@/App.css";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import Login from "@/pages/Login";
-import AuthCallback from "@/pages/AuthCallback";
 import Chat from "@/pages/Chat";
 import Connections from "@/pages/Connections";
 import Dashboard from "@/pages/Dashboard";
@@ -22,11 +21,6 @@ function Protected({ children }) {
 }
 
 function Router() {
-  const location = useLocation();
-  // Handle Emergent OAuth callback (session_id in URL fragment) synchronously
-  if (location.hash?.includes("session_id=")) {
-    return <AuthCallback />;
-  }
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
